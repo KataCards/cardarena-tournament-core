@@ -1,4 +1,4 @@
-from cardarena_tournament_core.models import MatchupOutcome, Player, Round
+from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Round
 from cardarena_tournament_core.pairings.swiss import Swiss
 
 
@@ -96,6 +96,63 @@ def test_round_number_increments():
 
     round2 = swiss.pair()
     assert round2.round_number == 2
+
+
+def test_tiebreaker_sort_ranks_higher_owp_player_first():
+    """With use_tiebreaker_sort=True, equal-point players with better OWP rank
+    higher and are processed first in the pairing loop — shown by who becomes
+    player1 in the match between the two equal-point players.
+
+    Setup (5 players, input order [P0, P4, P2, P1, P3] so that a stable
+    points-only sort ranks P2 above P1):
+      R1: P0 beats P1, P2 beats P3, P4 bye
+      R2: P0 beats P2, P4 beats P3, P1 bye
+
+    After R2: P0=6, P4=6, P1=3 (bye R2 + 0 R1), P2=3, P3=0
+      P1 real opponents: P0 only (2-0 → win%=1.0)  → OWP = 1.0
+      P2 real opponents: P3 (0-2 → 0.25) + P0 (2-0 → 1.0) → OWP = 0.625
+
+    Stable sort (no tiebreaker) keeps P2 before P1 (P2 is at index 2, P1 at index 3
+    in the input list [P0,P4,P2,P1,P3]).
+    Tiebreaker sort flips them: P1 (OWP=1.0) ranks above P2 (OWP=0.625).
+
+    In R3 the pairing algorithm iterates in rank order; the first unpaired player
+    becomes player1 of the matchup.  So with tiebreaker sort active, P1 becomes
+    player1 when it is paired against P2.
+    """
+    p0, p1, p2, p3, p4 = [Player(id=str(i), name=f"P{i}") for i in range(5)]
+    swiss = Swiss([p0, p4, p2, p1, p3], use_tiebreaker_sort=True)
+
+    round1 = Round(
+        round_number=1,
+        matchups=[
+            Matchup(player1=p0, player2=p1, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=p2, player2=p3, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=p4, player2=None),
+        ],
+    )
+    swiss.submit_results(round1)
+
+    round2 = Round(
+        round_number=2,
+        matchups=[
+            Matchup(player1=p0, player2=p2, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=p4, player2=p3, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=p1, player2=None),
+        ],
+    )
+    swiss.submit_results(round2)
+
+    round3 = swiss.pair()
+
+    matchup_p1_p2 = next(
+        matchup for matchup in round3.matchups
+        if {matchup.player1.id, matchup.player2.id if matchup.player2 else ""} == {"1", "2"}
+    )
+    # OWP sort ranks P1 higher → P1 is the outer-loop participant → P1 is player1
+    assert matchup_p1_p2.player1.id == "1", (
+        "Expected P1 (OWP=1.0) to outrank P2 (OWP=0.625) and appear as player1"
+    )
 
 
 def test_bye_player_receives_points():

@@ -10,14 +10,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MPL 2.0" }
 keywords = ["tournament", "swiss", "pairing", "tcg", "scoring"]
-dependencies = [
-    "ruff>=0.15.10",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-cov",
+    "ruff>=0.15.10",
 ]
 
 [tool.hatch.build.targets.wheel]

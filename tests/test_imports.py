@@ -39,3 +39,11 @@ def test_import_from_submodules():
     assert SingleElimination is not None
     assert PokemonTCG is not None
     assert YuGiOh is not None
+
+
+def test_abstract_base_classes_importable_for_extension():
+    """Users who want to implement custom formats must be able to import the ABCs."""
+    from cardarena_tournament_core import BasePairing, BaseScoring
+
+    assert BasePairing is not None
+    assert BaseScoring is not None

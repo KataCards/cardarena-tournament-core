@@ -13,7 +13,14 @@ class Swiss(BasePairing):
         use_tiebreaker_sort: When ``True``, players with equal points are
             further ordered by OWP then OOWP before pairing, producing
             strength-of-schedule-aware brackets from round 2 onward.
+
+    Point values used for internal ranking only — independent of the scoring system.
+    Both current TCG presets (PokemonTCG, YuGiOh) use the same values.
     """
+
+    WIN_POINTS: int = 3
+    DRAW_POINTS: int = 1
+    BYE_POINTS: int = 3
 
     def __init__(
         self,
@@ -63,16 +70,16 @@ class Swiss(BasePairing):
         """Record outcomes and update points and pairing history."""
         for matchup in completed_round.matchups:
             if matchup.player2 is None:
-                self._points[matchup.player1.id] += 3
+                self._points[matchup.player1.id] += self.BYE_POINTS
             elif matchup.outcome == MatchupOutcome.PLAYER1_WINS:
-                self._points[matchup.player1.id] += 3
+                self._points[matchup.player1.id] += self.WIN_POINTS
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
             elif matchup.outcome == MatchupOutcome.PLAYER2_WINS:
-                self._points[matchup.player2.id] += 3
+                self._points[matchup.player2.id] += self.WIN_POINTS
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
             elif matchup.outcome == MatchupOutcome.DRAW:
-                self._points[matchup.player1.id] += 1
-                self._points[matchup.player2.id] += 1
+                self._points[matchup.player1.id] += self.DRAW_POINTS
+                self._points[matchup.player2.id] += self.DRAW_POINTS
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
         super().submit_results(completed_round)
 

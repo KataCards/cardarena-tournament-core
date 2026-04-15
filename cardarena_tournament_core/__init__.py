@@ -7,10 +7,11 @@ from cardarena_tournament_core.models import (
     Standing,
     Team,
 )
-from cardarena_tournament_core.pairings import RoundRobin, SingleElimination, Swiss
-from cardarena_tournament_core.scoring import PokemonTCG, YuGiOh
+from cardarena_tournament_core.pairings import BasePairing, RoundRobin, SingleElimination, Swiss
+from cardarena_tournament_core.scoring import BaseScoring, PokemonTCG, YuGiOh
 
 __all__ = [
+    # Models
     "Player",
     "Team",
     "Participant",
@@ -18,9 +19,13 @@ __all__ = [
     "MatchupOutcome",
     "Round",
     "Standing",
+    # Pairing formats
+    "BasePairing",
     "Swiss",
     "RoundRobin",
     "SingleElimination",
+    # Scoring systems
+    "BaseScoring",
     "PokemonTCG",
     "YuGiOh",
 ]

@@ -24,25 +24,25 @@ def test_player_empty_name_raises_error():
 
 # Team Tests
 def test_team_fields():
-    team = Team(id="team1", name="Dragon Slayers", members=["Alice", "Bob", "Carol"])
+    team = Team(id="team1", name="Dragon Slayers", members=("Alice", "Bob", "Carol"))
     assert team.id == "team1"
     assert team.name == "Dragon Slayers"
-    assert team.members == ["Alice", "Bob", "Carol"]
+    assert team.members == ("Alice", "Bob", "Carol")
 
 
 def test_team_empty_id_raises_error():
     with pytest.raises(ValueError, match="Team id cannot be empty"):
-        Team(id="", name="Team", members=["Alice"])
+        Team(id="", name="Team", members=("Alice",))
 
 
 def test_team_empty_name_raises_error():
     with pytest.raises(ValueError, match="Team name cannot be empty"):
-        Team(id="t1", name="", members=["Alice"])
+        Team(id="t1", name="", members=("Alice",))
 
 
 def test_team_empty_members_raises_error():
     with pytest.raises(ValueError, match="Team must have at least one member"):
-        Team(id="t1", name="Team", members=[])
+        Team(id="t1", name="Team", members=())
 
 
 # Matchup Tests

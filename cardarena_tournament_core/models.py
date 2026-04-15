@@ -33,7 +33,7 @@ class Team:
 
     id: str
     name: str
-    members: list[str]
+    members: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -91,7 +91,7 @@ class Round:
         """``True`` when every matchup in this round has a recorded outcome."""
         return all(matchup.is_complete for matchup in self.matchups)
 
-    def get_player_matchup(self, player_id: str) -> "Matchup | None":
+    def get_player_matchup(self, player_id: str) -> Matchup | None:
         """Return the matchup that involves *player_id*, or ``None`` if not found."""
         for matchup in self.matchups:
             if matchup.player1.id == player_id:
