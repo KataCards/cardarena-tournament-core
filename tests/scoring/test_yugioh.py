@@ -1,5 +1,5 @@
 from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Round
-from cardarena_tournament_core.scoring.yugioh import YuGiOh
+from cardarena_tournament_core.scoring.yugioh_tcg import YuGiOh
 
 
 def _two_player_round(outcome: MatchupOutcome) -> list[Round]:
