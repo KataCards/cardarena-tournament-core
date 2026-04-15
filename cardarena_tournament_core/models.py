@@ -15,7 +15,7 @@ class MatchupOutcome(Enum):
 
 @dataclass(frozen=True)
 class Player:
-    """Individual tournament participant."""
+    """An individual tournament participant identified by a unique id."""
 
     id: str
     name: str
@@ -29,7 +29,7 @@ class Player:
 
 @dataclass(frozen=True)
 class Team:
-    """Team tournament participant."""
+    """A team of players that competes as a single tournament participant."""
 
     id: str
     name: str
@@ -44,15 +44,16 @@ class Team:
             raise ValueError("Team must have at least one member")
 
 
-# Type alias for any tournament participant
+# Either an individual player or a team can participate in a tournament.
 Participant = Player | Team
 
 
 @dataclass
 class Matchup:
-    """Single match between two participants (players or teams).
+    """A single scheduled match between two participants.
 
-    If player2 is None, player1 receives a bye (automatic win).
+    When ``player2`` is ``None`` the match is a bye: ``player1`` wins automatically
+    without facing a real opponent.
     """
 
     player1: Participant
@@ -60,25 +61,23 @@ class Matchup:
     outcome: MatchupOutcome = MatchupOutcome.PENDING
 
     def __post_init__(self) -> None:
-        if self.player1 is None:
-            raise ValueError("player1 cannot be None")
         if self.player2 is not None and self.player1.id == self.player2.id:
             raise ValueError("A participant cannot be matched against themselves")
 
     @property
     def is_bye(self) -> bool:
-        """True if this is a bye (player2 is None)."""
+        """``True`` when ``player2`` is ``None`` (bye match)."""
         return self.player2 is None
 
     @property
     def is_complete(self) -> bool:
-        """True if outcome is not PENDING."""
+        """``True`` when a result has been recorded (outcome is not ``PENDING``)."""
         return self.outcome != MatchupOutcome.PENDING
 
 
 @dataclass
 class Round:
-    """Single round of tournament play containing multiple matchups."""
+    """A single round of play containing one or more matchups."""
 
     round_number: int
     matchups: list[Matchup] = field(default_factory=list)
@@ -89,11 +88,11 @@ class Round:
 
     @property
     def is_complete(self) -> bool:
-        """True if all matchups are complete."""
-        return all(m.is_complete for m in self.matchups)
+        """``True`` when every matchup in this round has a recorded outcome."""
+        return all(matchup.is_complete for matchup in self.matchups)
 
-    def get_player_matchup(self, player_id: str) -> Matchup | None:
-        """Find matchup containing the specified player."""
+    def get_player_matchup(self, player_id: str) -> "Matchup | None":
+        """Return the matchup that involves *player_id*, or ``None`` if not found."""
         for matchup in self.matchups:
             if matchup.player1.id == player_id:
                 return matchup
@@ -104,12 +103,11 @@ class Round:
 
 @dataclass
 class Standing:
-    """Participant's standing in tournament rankings.
+    """A participant's position in the tournament standings after scoring.
 
-    Works for both individual players and teams.
-    Tiebreakers dict is flexible to accommodate different scoring systems:
-    - Pokémon: {"owp": 0.667, "oowp": 0.500}
-    - Yu-Gi-Oh!: {"owp": 0.667, "oowp": 0.500, "tiebreak_number": 9667500.0}
+    The ``tiebreakers`` dict holds format-specific secondary sort values, e.g.:
+    - Pokémon TCG: ``{"owp": 0.667, "oowp": 0.500}``
+    - Yu-Gi-Oh! TCG: ``{"owp": 0.667, "oowp": 0.500, "tiebreak_number": 6667500.0}``
     """
 
     player: Participant
