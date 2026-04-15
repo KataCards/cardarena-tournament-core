@@ -9,7 +9,7 @@ class MatchupOutcome(Enum):
     DRAW = "draw"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Player:
     id: str
     name: str

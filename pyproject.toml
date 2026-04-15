@@ -19,7 +19,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["cardarena-tournament-core"]
+packages = ["cardarena_tournament_core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
