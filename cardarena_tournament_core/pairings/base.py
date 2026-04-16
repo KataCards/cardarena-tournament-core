@@ -43,7 +43,62 @@ class BasePairing(ABC):
 
         self._participants: list[Participant] = participant_list
         self._participant_ids: set[str] = seen_ids
+        self._active_ids: set[str] = set(seen_ids)
         self._rounds: list[Round] = []
+        self._round_snapshots: dict[int, frozenset[str]] = {}
+
+    # -------------------------------------------------------------------------
+    # Active roster lifecycle
+    # -------------------------------------------------------------------------
+
+    def remove_active_participant(self, player_id: str) -> None:
+        """Mark a participant as inactive for future pairings.
+
+        Historical rounds, points, and tiebreaker data are preserved.
+        The participant will not appear as a candidate in future ``pair()`` calls.
+
+        Raises:
+            PairingStateError: *player_id* is not registered, or is already inactive.
+        """
+        if player_id not in self._participant_ids:
+            raise PairingStateError(
+                f"Cannot remove participant '{player_id}': not registered in this tournament."
+            )
+        if player_id not in self._active_ids:
+            raise PairingStateError(
+                f"Cannot remove participant '{player_id}': already inactive."
+            )
+        self._active_ids.discard(player_id)
+
+    def reactivate_participant(self, player_id: str) -> None:
+        """Re-admit an inactive participant for future pairings.
+
+        Raises:
+            PairingStateError: *player_id* is not registered, or is already active.
+        """
+        if player_id not in self._participant_ids:
+            raise PairingStateError(
+                f"Cannot reactivate participant '{player_id}': not registered in this tournament."
+            )
+        if player_id in self._active_ids:
+            raise PairingStateError(
+                f"Cannot reactivate participant '{player_id}': already active."
+            )
+        self._active_ids.add(player_id)
+
+    # -------------------------------------------------------------------------
+    # Internal snapshot registry
+    # -------------------------------------------------------------------------
+
+    def _register_round_snapshot(self, round_number: int) -> None:
+        """Save the current active-id set as the authoritative participant list
+        for *round_number*.  Called by ``pair()`` implementations just before
+        returning a new round.
+
+        The snapshot is used by ``_validate_round_submission`` so that a removal
+        made *after* pairing does not prevent submission of that already-paired round.
+        """
+        self._round_snapshots[round_number] = frozenset(self._active_ids)
 
     # -------------------------------------------------------------------------
     # Internal validation
@@ -65,18 +120,24 @@ class BasePairing(ABC):
                 "Cannot submit incomplete rounds. Record all matchup outcomes first."
             )
 
+        # Use the snapshot taken at pair() time when available; fall back to all
+        # registered participant IDs for backward compatibility with formats that
+        # do not register snapshots.
+        valid_ids: frozenset[str] | set[str] = self._round_snapshots.get(
+            completed_round.round_number, self._participant_ids
+        )
+
         for matchup in completed_round.matchups:
-            if matchup.player1.id not in self._participant_ids:
+            if matchup.player1.id not in valid_ids:
                 raise PairingStateError(
                     "Round contains a participant that is not registered in this tournament: "
                     f"{matchup.player1.id}."
                 )
-            if matchup.player2 is not None and matchup.player2.id not in self._participant_ids:
+            if matchup.player2 is not None and matchup.player2.id not in valid_ids:
                 raise PairingStateError(
                     "Round contains a participant that is not registered in this tournament: "
                     f"{matchup.player2.id}."
                 )
-
 
     # -------------------------------------------------------------------------
     # Pairing / Submission interface
@@ -95,7 +156,6 @@ class BasePairing(ABC):
         """
         self._validate_round_submission(completed_round)
         self._rounds.append(completed_round)
-    
 
     # -------------------------------------------------------------------------
     # Read-only views
@@ -107,6 +167,14 @@ class BasePairing(ABC):
         return list(self._participants)
 
     @property
+    def active_participant_ids(self) -> frozenset[str]:
+        """IDs of participants currently eligible for future pairings (read-only)."""
+        return frozenset(self._active_ids)
+
+    @property
     def rounds(self) -> list[Round]:
         """All submitted rounds in chronological order (read-only copy)."""
         return list(self._rounds)
+
+
+__all__ = ["BasePairing"]
