@@ -34,7 +34,38 @@ Requires Python 3.11 or later.
 
 ## Quick Start
 
-### Swiss Pairing
+### Tournament (recommended entry point)
+
+`Tournament` wires a pairing format and a scoring system together so you never need to manage them separately:
+
+```python
+from cardarena_tournament_core import (
+    Player, MatchupOutcome, Swiss, PokemonTCG, Tournament, TournamentCompleteError,
+)
+
+players = [Player(id=str(i), name=f"Player {i}") for i in range(8)]
+tournament = Tournament(pairing=Swiss(players), scoring=PokemonTCG())
+
+try:
+    while True:
+        round_ = tournament.pair()
+
+        for matchup in round_.matchups:
+            if matchup.player2 is not None:
+                matchup.outcome = MatchupOutcome.PLAYER1_WINS
+
+        tournament.submit_results(round_)
+
+        for standing in tournament.standings():
+            print(f"{standing.rank}. {standing.player.name} — {standing.points} pts")
+
+except TournamentCompleteError:
+    print("Tournament complete!")
+```
+
+Swap in any combination — `RoundRobin` + `YuGiOh()`, `SingleElimination` + `PokemonTCG()`, or your own custom subclasses.
+
+### Swiss Pairing (standalone)
 
 ```python
 from cardarena_tournament_core import Player, MatchupOutcome, Swiss
@@ -42,10 +73,8 @@ from cardarena_tournament_core import Player, MatchupOutcome, Swiss
 players = [Player(id=str(i), name=f"Player {i}") for i in range(8)]
 swiss = Swiss(players)
 
-# Generate round 1
 round1 = swiss.pair()
 
-# Record results
 for matchup in round1.matchups:
     if matchup.player2 is not None:
         matchup.outcome = MatchupOutcome.PLAYER1_WINS
@@ -184,21 +213,22 @@ class ChessScoring(BaseScoring):
 ```
 cardarena_tournament_core/
 ├── models.py               # Player, Team, Matchup, Round, Standing, TournamentCompleteError
+├── tournament.py           # Tournament orchestrator
 ├── py.typed                # PEP 561 typed package marker
 ├── pairings/
 │   ├── base/
-│   │   ├── __init__.py     # re-exports BasePairing
-│   │   └── base.py         # BasePairing ABC
+│   │   └── __init__.py     # BasePairing ABC
 │   ├── swiss.py
 │   ├── round_robin.py
 │   └── elimination.py
 └── scoring/
     ├── base/
-    │   ├── __init__.py     # re-exports BaseScoring, TCGBaseScoring
-    │   ├── base.py         # BaseScoring ABC
-    │   └── base_tcg.py     # TCGBaseScoring — shared OWP/OOWP helpers (internal)
-    ├── pokemon_tcg.py
-    └── yugioh_tcg.py
+    │   └── __init__.py     # BaseScoring ABC
+    └── tcg/
+        ├── __init__.py     # re-exports TCGBaseScoring, PokemonTCG, YuGiOh
+        ├── base_tcg.py     # TCGBaseScoring — shared OWP/OOWP helpers (internal)
+        ├── pokemon_tcg.py
+        └── yugioh_tcg.py
 ```
 
 ---
@@ -209,6 +239,8 @@ All public names are importable directly from the package root:
 
 ```python
 from cardarena_tournament_core import (
+    # Orchestrator
+    Tournament,
     # Models
     Player, Team, Participant,
     Matchup, MatchupOutcome,

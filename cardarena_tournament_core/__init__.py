@@ -10,6 +10,7 @@ from cardarena_tournament_core.models import (
 )
 from cardarena_tournament_core.pairings import BasePairing, RoundRobin, SingleElimination, Swiss
 from cardarena_tournament_core.scoring import BaseScoring, PokemonTCG, YuGiOh
+from cardarena_tournament_core.tournament import Tournament
 
 __all__ = [
     # Models
@@ -30,4 +31,6 @@ __all__ = [
     "BaseScoring",
     "PokemonTCG",
     "YuGiOh",
+    # Orchestrator
+    "Tournament",
 ]

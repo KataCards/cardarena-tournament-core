@@ -14,6 +14,7 @@ def test_import_from_package_root():
         SingleElimination,
         Swiss,
         Team,
+        Tournament,
         TournamentCompleteError,
         YuGiOh,
     )
@@ -30,6 +31,7 @@ def test_import_from_package_root():
     assert SingleElimination is not None
     assert PokemonTCG is not None
     assert YuGiOh is not None
+    assert Tournament is not None
 
 
 def test_import_from_submodules():
