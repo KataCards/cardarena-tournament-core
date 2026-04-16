@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round, TournamentCompleteError
 from cardarena_tournament_core.pairings.base import BasePairing
 
@@ -11,7 +13,7 @@ class SingleElimination(BasePairing):
     seed a bye (automatic advancement).
     """
 
-    def __init__(self, participants: list[Participant]) -> None:
+    def __init__(self, participants: Sequence[Participant]) -> None:
         super().__init__(participants)
         self._active_participants: list[Participant] = list(participants)
 

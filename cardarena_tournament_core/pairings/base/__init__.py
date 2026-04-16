@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from cardarena_tournament_core.models import Participant, Round
 
@@ -12,8 +13,8 @@ class BasePairing(ABC):
     at the end of any override so the round history stays consistent.
     """
 
-    def __init__(self, participants: list[Participant]) -> None:
-        self._participants: list[Participant] = participants
+    def __init__(self, participants: Sequence[Participant]) -> None:
+        self._participants: list[Participant] = list(participants)
         self._rounds: list[Round] = []
 
     @abstractmethod

@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round
 from cardarena_tournament_core.pairings.base import BasePairing
 
@@ -24,7 +26,7 @@ class Swiss(BasePairing):
 
     def __init__(
         self,
-        participants: list[Participant],
+        participants: Sequence[Participant],
         use_tiebreaker_sort: bool = False,
     ) -> None:
         super().__init__(participants)
