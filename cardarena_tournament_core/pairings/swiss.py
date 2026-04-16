@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from cardarena_tournament_core.common.errors import (
     PairingConfigurationError,
     PairingStateError,
+    TournamentCompleteError,
 )
 from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Participant, Round
 from cardarena_tournament_core.pairings.base import BasePairing
@@ -82,6 +83,12 @@ class Swiss(BasePairing):
         """
         round_number = len(self._rounds) + 1
         ranked_participants = self._rank_participants()
+
+        if not ranked_participants:
+            raise TournamentCompleteError(
+                "No active participants remain — the tournament cannot be paired."
+            )
+
         already_paired: set[str] = set()
         matchups: list[Matchup] = []
 

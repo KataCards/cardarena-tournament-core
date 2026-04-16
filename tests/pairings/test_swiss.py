@@ -3,6 +3,7 @@ import pytest
 from cardarena_tournament_core.common.errors import (
     PairingConfigurationError,
     PairingStateError,
+    TournamentCompleteError,
 )
 from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Player, Round
 from cardarena_tournament_core.pairings.swiss import Swiss
@@ -314,3 +315,19 @@ def test_removal_preserves_points_and_play_history():
     assert swiss._points["0"] == points_before
     # played_pairs must still record the pair that included "0"
     assert any("0" in pair for pair in swiss._played_pairs)
+
+def test_pair_raises_when_no_active_participants_remain():
+    """pair() must raise TournamentCompleteError when all players have been removed."""
+    players = make_players(2)
+    swiss = Swiss(players)
+    round1 = swiss.pair()
+    for m in round1.matchups:
+        if m.player2 is not None:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss.submit_results(round1)
+
+    swiss.remove_active_participant("0")
+    swiss.remove_active_participant("1")
+
+    with pytest.raises(TournamentCompleteError, match="No active participants remain"):
+        swiss.pair()
