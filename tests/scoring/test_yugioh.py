@@ -1,5 +1,5 @@
 from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Round
-from cardarena_tournament_core.scoring.tcg import YuGiOh
+from cardarena_tournament_core.scoring.yugioh import YuGiOh
 
 
 def _two_player_round(outcome: MatchupOutcome) -> list[Round]:
@@ -27,22 +27,20 @@ def test_bye_gives_3_points():
     assert standings[0].points == 3
 
 
-def test_standings_include_tiebreak_number():
-    """Yu-Gi-Oh! standings should include owp, oowp, and tiebreak_number."""
+def test_standings_include_tiebreakers():
+    """Yu-Gi-Oh! standings should include owp and oowp tiebreakers."""
     standings = YuGiOh().calculate(_two_player_round(MatchupOutcome.PLAYER1_WINS))
     for s in standings:
         assert "owp" in s.tiebreakers
         assert "oowp" in s.tiebreakers
-        assert "tiebreak_number" in s.tiebreakers
+        # tiebreak_number was removed - now using Pythonic tuple sorting
+        assert "tiebreak_number" not in s.tiebreakers
 
 
-def test_tiebreak_number_encoding():
-    """Test the 8-digit tiebreak number encoding: XXYYYZZZ format.
+def test_owp_calculation():
+    """Test OWP (Opponents' Win Percentage) calculation.
     
-    Format breakdown:
-    - XX = Points (0-99)
-    - YYY = OWP scaled to 0-999
-    - ZZZ = OOWP scaled to 0-999
+    OWP is the average win percentage of all opponents faced.
     """
     # Simple 4-player scenario
     p0, p1, p2, p3 = [Player(id=str(i), name=f"P{i}") for i in range(4)]
@@ -78,27 +76,10 @@ def test_tiebreak_number_encoding():
     # P0's opponents: P1 (1-1 = 0.5), P2 (1-1 = 0.5)
     # OWP = (0.5 + 0.5) / 2 = 0.5
     assert abs(p0_standing.tiebreakers["owp"] - 0.5) < 0.01
-    
-    # Tiebreak number format: XXYYYZZZ
-    # XX = 06 (6 points)
-    # YYY = 500 (OWP = 0.5)
-    # ZZZ = OOWP value
-    tiebreak = int(p0_standing.tiebreakers["tiebreak_number"])
-    
-    # First 2 digits should be 06 (6 points)
-    points_part = tiebreak // 1000000
-    assert points_part == 6
-    
-    # Next 3 digits should be ~500 (OWP scaled)
-    owp_part = (tiebreak % 1000000) // 1000
-    assert abs(owp_part - 500) <= 1  # Allow for rounding
-    
-    # Verify tiebreak is in valid range (8 digits max: 99999999)
-    assert 0 <= tiebreak <= 99999999
 
 
-def test_tiebreak_number_breaks_ties():
-    """Two players with same points: higher tiebreak number wins."""
+def test_owp_breaks_ties():
+    """Two players with same points: higher OWP wins."""
     # Create scenario where two players have same points but different opponent strength
     p0, p1, p2, p3 = [Player(id=str(i), name=f"P{i}") for i in range(4)]
     
@@ -120,8 +101,8 @@ def test_tiebreak_number_breaks_ties():
     ]
     
     # P0: 6pts (beat P1, P3). P1: 3pts (beat P2). P2: 3pts (beat P3). P3: 0pts.
-    # P1 opponents: P0 (2-0=1.0), P2 (1-1=0.5) → OWP = 0.75 → tiebreak ~750XXX
-    # P2 opponents: P3 (0-2=0.25), P1 (1-1=0.5) → OWP = 0.375 → tiebreak ~375XXX
+    # P1 opponents: P0 (2-0=1.0), P2 (1-1=0.5) → OWP = 0.75
+    # P2 opponents: P3 (0-2=0.25), P1 (1-1=0.5) → OWP = 0.375
     
     standings = YuGiOh().calculate(rounds)
     p1_standing = next(s for s in standings if s.player.id == "1")
@@ -131,13 +112,13 @@ def test_tiebreak_number_breaks_ties():
     assert p1_standing.points == 3
     assert p2_standing.points == 3
     
-    # P1 should rank higher due to better tiebreak number
+    # P1 should rank higher due to better OWP
     assert p1_standing.rank < p2_standing.rank
-    assert p1_standing.tiebreakers["tiebreak_number"] > p2_standing.tiebreakers["tiebreak_number"]
+    assert p1_standing.tiebreakers["owp"] > p2_standing.tiebreakers["owp"]
 
 
-def test_tiebreak_number_format():
-    """Tiebreak number should be 8 digits or less (XXYYYZZZ format)."""
+def test_tiebreaker_values_are_floats():
+    """OWP and OOWP should be float values between 0.0 and 1.0."""
     p0, p1 = Player(id="0", name="P0"), Player(id="1", name="P1")
     rounds = [
         Round(
@@ -148,9 +129,13 @@ def test_tiebreak_number_format():
     
     standings = YuGiOh().calculate(rounds)
     for s in standings:
-        tiebreak = s.tiebreakers["tiebreak_number"]
-        # Should be between 0 and 99999999 (8 digits max: 99 points + 999 + 999)
-        assert 0 <= tiebreak <= 99999999
+        owp = s.tiebreakers["owp"]
+        oowp = s.tiebreakers["oowp"]
+        # Should be floats between 0.0 and 1.0
+        assert isinstance(owp, float)
+        assert isinstance(oowp, float)
+        assert 0.0 <= owp <= 1.0
+        assert 0.0 <= oowp <= 1.0
 
 
 def test_bye_excluded_from_tiebreakers():
@@ -173,20 +158,21 @@ def test_bye_excluded_from_tiebreakers():
         # No real opponents → OWP and OOWP should be 0.0
         assert s.tiebreakers["owp"] == 0.0
         assert s.tiebreakers["oowp"] == 0.0
-        # Tiebreak number should be 03000000 (3 points, 0 OWP, 0 OOWP)
-        assert s.tiebreakers["tiebreak_number"] == 3000000.0
 
 
-def test_standings_sorted_by_points_then_tiebreak():
-    """Standings should be sorted by points (desc), then tiebreak number (desc)."""
+def test_standings_sorted_by_points_then_owp_then_oowp():
+    """Standings should be sorted by points (desc), then OWP (desc), then OOWP (desc)."""
     standings = YuGiOh().calculate(_two_player_round(MatchupOutcome.PLAYER1_WINS))
 
     # Winner should be ranked 1st
     assert standings[0].points >= standings[1].points
 
-    # If points are equal, higher tiebreak number should rank higher
+    # If points are equal, higher OWP should rank higher
     if standings[0].points == standings[1].points:
-        assert standings[0].tiebreakers["tiebreak_number"] >= standings[1].tiebreakers["tiebreak_number"]
+        assert standings[0].tiebreakers["owp"] >= standings[1].tiebreakers["owp"]
+        # If OWP is also equal, higher OOWP should rank higher
+        if standings[0].tiebreakers["owp"] == standings[1].tiebreakers["owp"]:
+            assert standings[0].tiebreakers["oowp"] >= standings[1].tiebreakers["oowp"]
 
 
 def test_calculate_empty_rounds_returns_empty():

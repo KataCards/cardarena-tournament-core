@@ -1,3 +1,4 @@
+from cardarena_tournament_core.errors import TournamentCompleteError
 from cardarena_tournament_core.models import (
     Matchup,
     MatchupOutcome,
@@ -6,7 +7,6 @@ from cardarena_tournament_core.models import (
     Round,
     Standing,
     Team,
-    TournamentCompleteError,
 )
 from cardarena_tournament_core.pairings import BasePairing, RoundRobin, SingleElimination, Swiss
 from cardarena_tournament_core.scoring import BaseScoring, PokemonTCG, YuGiOh

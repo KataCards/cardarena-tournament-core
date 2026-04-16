@@ -2,12 +2,13 @@
 
 import pytest
 
-from cardarena_tournament_core.models import MatchupOutcome, Player, TournamentCompleteError
+from cardarena_tournament_core.errors import TournamentCompleteError
+from cardarena_tournament_core.models import MatchupOutcome, Player
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 from cardarena_tournament_core.pairings.round_robin import RoundRobin
 from cardarena_tournament_core.pairings.swiss import Swiss
-from cardarena_tournament_core.scoring.tcg.pokemon_tcg import PokemonTCG
-from cardarena_tournament_core.scoring.tcg.yugioh_tcg import YuGiOh
+from cardarena_tournament_core.scoring.pokemon import PokemonTCG
+from cardarena_tournament_core.scoring.yugioh import YuGiOh
 from cardarena_tournament_core.tournament import Tournament
 
 
@@ -118,7 +119,9 @@ def test_round_robin_with_yugioh_scoring():
 
     standings = t.standings()
     assert len(standings) == 4
-    assert all("tiebreak_number" in s.tiebreakers for s in standings)
+    # YuGiOh now uses OWP/OOWP tiebreakers (tiebreak_number was removed)
+    assert all("owp" in s.tiebreakers for s in standings)
+    assert all("oowp" in s.tiebreakers for s in standings)
 
 
 def test_single_elimination_with_pokemon_scoring():

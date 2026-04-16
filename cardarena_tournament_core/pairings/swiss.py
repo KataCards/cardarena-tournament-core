@@ -2,8 +2,7 @@ from collections.abc import Sequence
 
 from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round
 from cardarena_tournament_core.pairings.base import BasePairing
-
-_MIN_WIN_PCT = 0.25
+from cardarena_tournament_core import utils
 
 
 class Swiss(BasePairing):
@@ -93,8 +92,8 @@ class Swiss(BasePairing):
                 self.participants,
                 key=lambda participant: (
                     self._points[participant.id],
-                    self._owp(participant.id),
-                    self._oowp(participant.id),
+                    utils.owp(participant.id, self._rounds, min_win_pct=0.25),
+                    utils.oowp(participant.id, self._rounds, min_win_pct=0.25),
                 ),
                 reverse=True,
             )
@@ -131,55 +130,3 @@ class Swiss(BasePairing):
             ),
             None,
         )
-
-    # ── tiebreaker helpers (used only when use_tiebreaker_sort=True) ──────────
-
-    def _win_percentage(self, player_id: str) -> float:
-        """Win% for a player across all submitted rounds (byes excluded, floored at 0.25)."""
-        wins = draws = total_games = 0
-        for tournament_round in self._rounds:
-            for matchup in tournament_round.matchups:
-                if matchup.player2 is None:
-                    continue  # byes don't count toward win percentage
-                if matchup.player1.id == player_id:
-                    total_games += 1
-                    if matchup.outcome == MatchupOutcome.PLAYER1_WINS:
-                        wins += 1
-                    elif matchup.outcome == MatchupOutcome.DRAW:
-                        draws += 1
-                elif matchup.player2.id == player_id:
-                    total_games += 1
-                    if matchup.outcome == MatchupOutcome.PLAYER2_WINS:
-                        wins += 1
-                    elif matchup.outcome == MatchupOutcome.DRAW:
-                        draws += 1
-        if total_games == 0:
-            return _MIN_WIN_PCT
-        return max((wins + 0.5 * draws) / total_games, _MIN_WIN_PCT)
-
-    def _real_opponent_ids(self, player_id: str) -> list[str]:
-        """IDs of all real opponents faced so far (bye matches excluded)."""
-        opponent_ids: list[str] = []
-        for tournament_round in self._rounds:
-            for matchup in tournament_round.matchups:
-                if matchup.player2 is None:
-                    continue
-                if matchup.player1.id == player_id:
-                    opponent_ids.append(matchup.player2.id)
-                elif matchup.player2.id == player_id:
-                    opponent_ids.append(matchup.player1.id)
-        return opponent_ids
-
-    def _owp(self, player_id: str) -> float:
-        """Opponents' Win Percentage: average win% across all real opponents."""
-        opponent_ids = self._real_opponent_ids(player_id)
-        if not opponent_ids:
-            return 0.0
-        return sum(self._win_percentage(opponent_id) for opponent_id in opponent_ids) / len(opponent_ids)
-
-    def _oowp(self, player_id: str) -> float:
-        """Opponents' Opponents' Win Percentage: average OWP across all real opponents."""
-        opponent_ids = self._real_opponent_ids(player_id)
-        if not opponent_ids:
-            return 0.0
-        return sum(self._owp(opponent_id) for opponent_id in opponent_ids) / len(opponent_ids)

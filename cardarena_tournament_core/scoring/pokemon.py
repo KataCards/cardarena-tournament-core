@@ -1,5 +1,5 @@
-from cardarena_tournament_core.models import MatchupOutcome, Round, Standing
-from cardarena_tournament_core.scoring.tcg.base_tcg import TCGBaseScoring
+from cardarena_tournament_core.models import Round, Standing
+from cardarena_tournament_core.scoring.base import TCGBaseScoring
 
 
 class PokemonTCG(TCGBaseScoring):
@@ -26,27 +26,10 @@ class PokemonTCG(TCGBaseScoring):
     def calculate(self, rounds: list[Round]) -> list[Standing]:
         """Return standings sorted by points → OWP → OOWP (all descending)."""
         player_map = self._collect_players(rounds)
-        points_by_player: dict[str, int] = {player_id: 0 for player_id in player_map}
-
-        for tournament_round in rounds:
-            for matchup in tournament_round.matchups:
-                if matchup.player2 is None:
-                    points_by_player[matchup.player1.id] += self.BYE_POINTS
-                elif matchup.outcome == MatchupOutcome.PLAYER1_WINS:
-                    points_by_player[matchup.player1.id] += self.WIN_POINTS
-                elif matchup.outcome == MatchupOutcome.PLAYER2_WINS:
-                    points_by_player[matchup.player2.id] += self.WIN_POINTS
-                elif matchup.outcome == MatchupOutcome.DRAW:
-                    points_by_player[matchup.player1.id] += self.DRAW_POINTS
-                    points_by_player[matchup.player2.id] += self.DRAW_POINTS
-
-        # Compute tiebreakers once per player to avoid redundant passes
-        owp_by_player: dict[str, float] = {
-            player_id: self._owp(player_id, rounds) for player_id in player_map
-        }
-        oowp_by_player: dict[str, float] = {
-            player_id: self._oowp(player_id, rounds) for player_id in player_map
-        }
+        points_by_player = self._calculate_points(rounds)
+        owp_by_player, oowp_by_player = self._calculate_tiebreakers(
+            list(player_map.keys()), rounds, min_win_pct=0.25
+        )
 
         standings: list[Standing] = [
             Standing(

@@ -2,7 +2,8 @@
 
 import pytest
 
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Standing, Round, Team, TournamentCompleteError
+from cardarena_tournament_core.errors import TournamentCompleteError
+from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Standing, Round, Team
 
 
 # Player Tests

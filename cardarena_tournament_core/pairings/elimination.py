@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round, TournamentCompleteError
+from cardarena_tournament_core.errors import TournamentCompleteError
+from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round
 from cardarena_tournament_core.pairings.base import BasePairing
 
 

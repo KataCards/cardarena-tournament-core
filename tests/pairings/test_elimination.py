@@ -1,6 +1,7 @@
 import pytest
 
-from cardarena_tournament_core.models import MatchupOutcome, Player, TournamentCompleteError
+from cardarena_tournament_core.errors import TournamentCompleteError
+from cardarena_tournament_core.models import MatchupOutcome, Player
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 
 
