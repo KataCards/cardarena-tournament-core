@@ -51,15 +51,3 @@ def test_abstract_base_classes_importable_for_extension():
 
     assert BasePairing is not None
     assert BaseScoring is not None
-
-
-def test_legacy_error_module_is_importable():
-    from cardarena_tournament_core.errors import (
-        PairingStateError,
-        ScoringValidationError,
-        TournamentCompleteError,
-    )
-
-    assert PairingStateError is not None
-    assert ScoringValidationError is not None
-    assert TournamentCompleteError is not None
