@@ -107,3 +107,25 @@ class Tournament:
     def rounds(self) -> list[Round]:
         """All submitted rounds in chronological order (read-only copy)."""
         return self._pairing.rounds
+
+    # -------------------------------------------------------------------------
+    # Active roster lifecycle
+    # -------------------------------------------------------------------------
+
+    def remove_active_participant(self, player_id: str) -> None:
+        """Remove a participant from future pairings while preserving their history.
+
+        Delegates to the underlying pairing format.
+
+        Raises:
+            PairingStateError: *player_id* is not registered or is already inactive.
+        """
+        self._pairing.remove_active_participant(player_id)
+
+    @property
+    def active_participant_ids(self) -> frozenset[str]:
+        """IDs of participants currently eligible for future pairings (read-only).
+
+        Delegates to the underlying pairing format.
+        """
+        return self._pairing.active_participant_ids

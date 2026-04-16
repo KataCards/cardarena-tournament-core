@@ -177,3 +177,30 @@ def test_constructor_rejects_invalid_pairing_dependency():
 def test_constructor_rejects_invalid_scoring_dependency():
     with pytest.raises(TournamentConfigurationError, match="scoring must be an instance"):
         Tournament(pairing=Swiss(make_players(2)), scoring=object())  # type: ignore[arg-type]
+
+
+def test_remove_active_participant_delegates_to_pairing():
+    """Tournament.remove_active_participant removes player from future pairings."""
+    players = make_players(4)
+    t = Tournament(pairing=Swiss(players), scoring=PokemonTCG())
+
+    round1 = t.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    t.submit_results(round1)
+
+    t.remove_active_participant("3")  # remove after submitting round 1
+
+    round2 = t.pair()
+    round2_ids = {m.player1.id for m in round2.matchups}
+    round2_ids |= {m.player2.id for m in round2.matchups if m.player2 is not None}
+    assert "3" not in round2_ids
+
+
+def test_active_participant_ids_property_delegates_to_pairing():
+    players = make_players(4)
+    t = Tournament(pairing=Swiss(players), scoring=PokemonTCG())
+    assert t.active_participant_ids == frozenset({"0", "1", "2", "3"})
+    t.remove_active_participant("0")
+    assert "0" not in t.active_participant_ids
