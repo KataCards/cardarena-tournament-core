@@ -13,7 +13,7 @@ class BasePairing(ABC):
     """
 
     def __init__(self, participants: list[Participant]) -> None:
-        self.participants: list[Participant] = participants
+        self._participants: list[Participant] = participants
         self._rounds: list[Round] = []
 
     @abstractmethod
@@ -27,6 +27,11 @@ class BasePairing(ABC):
         ``super().submit_results(completed_round)`` to append to the history.
         """
         self._rounds.append(completed_round)
+
+    @property
+    def participants(self) -> list[Participant]:
+        """All participants in this tournament (read-only copy)."""
+        return list(self._participants)
 
     @property
     def rounds(self) -> list[Round]:
