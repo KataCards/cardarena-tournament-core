@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from cardarena_tournament_core.common.errors import TournamentCompleteError
+from cardarena_tournament_core.common.errors import PairingStateError, TournamentCompleteError
 from cardarena_tournament_core.common.models import Matchup, Participant, Player, Round
 from cardarena_tournament_core.pairings.base import BasePairing
 
@@ -26,6 +26,25 @@ class RoundRobin(BasePairing):
             self._build_schedule()
         )
 
+    # -------------------------------------------------------------------------
+    # Unsupported lifecycle operations
+    # -------------------------------------------------------------------------
+
+    def remove_active_participant(self, player_id: str) -> None:
+        """Not supported for Round Robin tournaments.
+
+        The full schedule is pre-computed at initialization and cannot be
+        modified.  Use Swiss pairing for tournaments that require dynamic
+        roster changes.
+
+        Raises:
+            PairingStateError: Always.
+        """
+        raise PairingStateError(
+            "Dynamic participant removal is not supported for Round Robin tournaments. "
+            "The schedule is pre-computed at initialization and cannot be modified. "
+            "Use Swiss pairing for tournaments that require dynamic roster changes."
+        )
 
     # -------------------------------------------------------------------------
     # Pairing interface

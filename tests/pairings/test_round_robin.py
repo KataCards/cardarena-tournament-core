@@ -96,3 +96,11 @@ def test_round_robin_5_players_each_pair_once():
 
     expected = {frozenset([str(i), str(j)]) for i, j in combinations(range(5), 2)}
     assert all_pairs == expected
+
+
+def test_remove_active_participant_raises_with_clear_message():
+    """Round Robin must reject removal because the schedule is pre-computed."""
+    from cardarena_tournament_core.common.errors import PairingStateError
+    rr = RoundRobin(make_players(4))
+    with pytest.raises(PairingStateError, match="not supported for Round Robin"):
+        rr.remove_active_participant("0")
