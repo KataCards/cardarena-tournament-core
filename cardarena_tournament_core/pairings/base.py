@@ -68,7 +68,7 @@ class BasePairing(ABC):
             raise PairingStateError(
                 f"Cannot remove participant '{player_id}': already inactive."
             )
-        self._active_ids.discard(player_id)
+        self._active_ids.remove(player_id)
 
     def reactivate_participant(self, player_id: str) -> None:
         """Re-admit an inactive participant for future pairings.
