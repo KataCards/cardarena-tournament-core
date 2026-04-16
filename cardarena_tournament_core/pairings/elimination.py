@@ -85,5 +85,5 @@ class SingleElimination(BasePairing):
                 "Submitting this round produced no advancing participants."
             )
 
-        self._active_ids = set(winner_ids)
         super().submit_results(completed_round)
+        self._active_ids = set(winner_ids)
