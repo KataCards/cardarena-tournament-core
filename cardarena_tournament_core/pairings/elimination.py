@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from cardarena_tournament_core.errors import TournamentCompleteError
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round
+from cardarena_tournament_core.common.errors import PairingStateError, TournamentCompleteError
+from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Participant, Round
 from cardarena_tournament_core.pairings.base import BasePairing
 
 
@@ -17,6 +17,10 @@ class SingleElimination(BasePairing):
     def __init__(self, participants: Sequence[Participant]) -> None:
         super().__init__(participants)
         self._active_participants: list[Participant] = list(participants)
+
+    # ----
+    # Public interface
+    # ----
 
     def pair(self) -> Round:
         """Generate matchups for the current elimination round.
@@ -58,5 +62,16 @@ class SingleElimination(BasePairing):
                 winners.append(matchup.player1)
             elif matchup.outcome == MatchupOutcome.PLAYER2_WINS:
                 winners.append(matchup.player2)
+            else:
+                raise PairingStateError(
+                    "Single elimination matchups must end with PLAYER1_WINS or "
+                    "PLAYER2_WINS."
+                )
+
+        if not winners:
+            raise PairingStateError(
+                "Submitting this round produced no advancing participants."
+            )
+
         self._active_participants = winners
         super().submit_results(completed_round)

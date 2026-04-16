@@ -1,7 +1,7 @@
 import pytest
 
-from cardarena_tournament_core.errors import TournamentCompleteError
-from cardarena_tournament_core.models import MatchupOutcome, Player
+from cardarena_tournament_core.common.errors import PairingStateError, TournamentCompleteError
+from cardarena_tournament_core.common.models import MatchupOutcome, Player, Round
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 
 
@@ -90,6 +90,14 @@ def test_tournament_complete_error_single_player():
         elim.pair()
 
 
+def test_tournament_complete_error_when_all_participants_eliminated():
+    elim = SingleElimination(make_players(2))
+    elim._active_participants = []
+
+    with pytest.raises(TournamentCompleteError, match="All participants have been eliminated"):
+        elim.pair()
+
+
 def test_round_numbers_increment():
     elim = SingleElimination(make_players(4))
     r1 = elim.pair()
@@ -99,3 +107,30 @@ def test_round_numbers_increment():
     elim.submit_results(r1)
     r2 = elim.pair()
     assert r2.round_number == 2
+
+
+def test_draw_outcome_rejected_in_single_elimination():
+    elim = SingleElimination(make_players(2))
+    round1 = elim.pair()
+    round1.matchups[0].outcome = MatchupOutcome.DRAW
+
+    with pytest.raises(PairingStateError, match="must end with PLAYER1_WINS or PLAYER2_WINS"):
+        elim.submit_results(round1)
+
+
+def test_submit_results_with_no_matchups_raises_pairing_state_error():
+    elim = SingleElimination(make_players(2))
+    empty_round = Round(round_number=1, matchups=[])
+
+    with pytest.raises(PairingStateError, match="no advancing participants"):
+        elim.submit_results(empty_round)
+
+
+def test_player2_win_advances_player2():
+    elim = SingleElimination(make_players(2))
+    round1 = elim.pair()
+    round1.matchups[0].outcome = MatchupOutcome.PLAYER2_WINS
+    elim.submit_results(round1)
+
+    with pytest.raises(TournamentCompleteError, match="is the champion"):
+        elim.pair()

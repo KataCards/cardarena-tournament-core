@@ -4,7 +4,22 @@ This module provides shared utility functions used across different tournament
 systems, including win percentage calculations and tiebreaker computations.
 """
 
-from cardarena_tournament_core.models import MatchupOutcome, Round
+from cardarena_tournament_core.common.errors import ScoringValidationError
+from cardarena_tournament_core.common.models import MatchupOutcome, Round
+
+
+# ----
+# Validation helpers
+# ----
+
+def _validate_player_id(player_id: str) -> None:
+    if not player_id:
+        raise ScoringValidationError("player_id cannot be empty.")
+
+
+def _validate_min_win_pct(min_win_pct: float) -> None:
+    if not 0.0 <= min_win_pct <= 1.0:
+        raise ScoringValidationError("min_win_pct must be within [0.0, 1.0].")
 
 
 def win_percentage(player_id: str, rounds: list[Round], *, min_win_pct: float = 0.0) -> float:
@@ -21,6 +36,9 @@ def win_percentage(player_id: str, rounds: list[Round], *, min_win_pct: float = 
     Returns:
         Win percentage as a float between min_win_pct and 1.0.
     """
+    _validate_player_id(player_id)
+    _validate_min_win_pct(min_win_pct)
+
     wins = draws = total_real_games = 0
     for tournament_round in rounds:
         for matchup in tournament_round.matchups:
@@ -57,6 +75,8 @@ def real_opponent_ids(player_id: str, rounds: list[Round]) -> list[str]:
     Returns:
         List of opponent IDs in chronological order.
     """
+    _validate_player_id(player_id)
+
     opponent_ids: list[str] = []
     for tournament_round in rounds:
         for matchup in tournament_round.matchups:
@@ -82,11 +102,19 @@ def owp(player_id: str, rounds: list[Round], *, min_win_pct: float = 0.0) -> flo
     Returns:
         Average opponent win percentage, or 0.0 if no opponents.
     """
+    _validate_player_id(player_id)
+    _validate_min_win_pct(min_win_pct)
+
     opponent_ids = real_opponent_ids(player_id, rounds)
     if not opponent_ids:
         return 0.0
+
+    win_pct_cache: dict[str, float] = {
+        opponent_id: win_percentage(opponent_id, rounds, min_win_pct=min_win_pct)
+        for opponent_id in set(opponent_ids)
+    }
     return sum(
-        win_percentage(opp_id, rounds, min_win_pct=min_win_pct)
+        win_pct_cache[opp_id]
         for opp_id in opponent_ids
     ) / len(opponent_ids)
 
@@ -104,11 +132,19 @@ def oowp(player_id: str, rounds: list[Round], *, min_win_pct: float = 0.0) -> fl
     Returns:
         Average opponent OWP, or 0.0 if no opponents.
     """
+    _validate_player_id(player_id)
+    _validate_min_win_pct(min_win_pct)
+
     opponent_ids = real_opponent_ids(player_id, rounds)
     if not opponent_ids:
         return 0.0
+
+    owp_cache: dict[str, float] = {
+        opponent_id: owp(opponent_id, rounds, min_win_pct=min_win_pct)
+        for opponent_id in set(opponent_ids)
+    }
     return sum(
-        owp(opp_id, rounds, min_win_pct=min_win_pct)
+        owp_cache[opp_id]
         for opp_id in opponent_ids
     ) / len(opponent_ids)
 

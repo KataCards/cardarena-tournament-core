@@ -1,4 +1,10 @@
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Round
+import pytest
+
+from cardarena_tournament_core.common.errors import (
+    PairingConfigurationError,
+    PairingStateError,
+)
+from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Player, Round
 from cardarena_tournament_core.pairings.swiss import Swiss
 
 
@@ -182,3 +188,79 @@ def test_bye_player_receives_points():
         m.player2.id for m in round2.matchups if m.player2 is not None
     }
     assert bye_m.player1.id in round2_player_ids
+
+
+def test_custom_point_values_are_used_for_internal_ranking():
+    # Custom config: win=5, draw=2, bye=0
+    # After R1 (one win + one bye), winner should rank above bye player.
+    p0, p1, p2 = [Player(id=str(i), name=f"P{i}") for i in range(3)]
+    swiss = Swiss([p0, p1, p2], win_points=5, draw_points=2, bye_points=0)
+
+    round1 = Round(
+        round_number=1,
+        matchups=[
+            Matchup(player1=p0, player2=p1, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=p2, player2=None),
+        ],
+    )
+    swiss.submit_results(round1)
+
+    round2 = swiss.pair()
+    non_bye_matchup = next(matchup for matchup in round2.matchups if matchup.player2 is not None)
+    assert non_bye_matchup.player1.id == "0"
+
+
+def test_negative_point_values_raise_configuration_error():
+    players = make_players(2)
+    with pytest.raises(PairingConfigurationError, match="must be non-negative"):
+        Swiss(players, win_points=-1)
+
+
+def test_draw_points_cannot_exceed_win_points():
+    with pytest.raises(PairingConfigurationError, match="draw_points cannot exceed"):
+        Swiss(make_players(2), win_points=2, draw_points=3)
+
+
+def test_bye_points_cannot_exceed_win_points():
+    with pytest.raises(PairingConfigurationError, match="bye_points cannot exceed"):
+        Swiss(make_players(2), win_points=2, bye_points=3)
+
+
+def test_tiebreaker_min_win_pct_must_be_in_range():
+    with pytest.raises(PairingConfigurationError, match=r"within \[0.0, 1.0\]"):
+        Swiss(make_players(2), tiebreaker_min_win_pct=1.5)
+
+
+def test_submit_results_rejects_unknown_outcome():
+    p0, p1 = make_players(2)
+    swiss = Swiss([p0, p1])
+    round1 = Round(round_number=1, matchups=[Matchup(player1=p0, player2=p1)])
+    round1.matchups[0].outcome = "invalid"  # type: ignore[assignment]
+
+    with pytest.raises(PairingStateError, match="must resolve"):
+        swiss.submit_results(round1)
+
+
+def test_submit_results_handles_player2_win_path():
+    p0, p1 = make_players(2)
+    swiss = Swiss([p0, p1])
+    round1 = Round(
+        round_number=1,
+        matchups=[Matchup(player1=p0, player2=p1, outcome=MatchupOutcome.PLAYER2_WINS)],
+    )
+    swiss.submit_results(round1)
+
+    round2 = swiss.pair()
+    assert round2.matchups[0].player1.id == "1"
+
+
+def test_submit_results_handles_draw_path():
+    p0, p1 = make_players(2)
+    swiss = Swiss([p0, p1])
+    round1 = Round(
+        round_number=1,
+        matchups=[Matchup(player1=p0, player2=p1, outcome=MatchupOutcome.DRAW)],
+    )
+    swiss.submit_results(round1)
+
+    assert len(swiss.rounds) == 1

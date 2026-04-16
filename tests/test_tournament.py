@@ -2,8 +2,11 @@
 
 import pytest
 
-from cardarena_tournament_core.errors import TournamentCompleteError
-from cardarena_tournament_core.models import MatchupOutcome, Player
+from cardarena_tournament_core.common.errors import (
+    TournamentCompleteError,
+    TournamentConfigurationError,
+)
+from cardarena_tournament_core.common.models import MatchupOutcome, Player
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 from cardarena_tournament_core.pairings.round_robin import RoundRobin
 from cardarena_tournament_core.pairings.swiss import Swiss
@@ -20,7 +23,9 @@ def make_tournament(n: int = 4) -> Tournament:
     return Tournament(pairing=Swiss(make_players(n)), scoring=PokemonTCG())
 
 
-# ── delegation ────────────────────────────────────────────────────────────────
+# ----
+# Delegation
+# ----
 
 def test_pair_returns_round():
     t = make_tournament()
@@ -58,7 +63,9 @@ def test_participants_property():
     assert {p.id for p in t.participants} == {"0", "1", "2", "3"}
 
 
-# ── standings ─────────────────────────────────────────────────────────────────
+# ----
+# Standings
+# ----
 
 def test_standings_empty_before_any_rounds():
     t = make_tournament()
@@ -104,7 +111,9 @@ def test_standings_callable_mid_tournament():
         assert len(standings) == 4
 
 
-# ── works with different pairing + scoring combinations ───────────────────────
+# ----
+# Pairing/scoring combinations
+# ----
 
 def test_round_robin_with_yugioh_scoring():
     players = make_players(4)
@@ -144,7 +153,9 @@ def test_single_elimination_with_pokemon_scoring():
     assert len(standings) == 4
 
 
-# ── error propagation ─────────────────────────────────────────────────────────
+# ----
+# Error propagation
+# ----
 
 def test_tournament_complete_error_propagates():
     players = make_players(2)
@@ -156,3 +167,13 @@ def test_tournament_complete_error_propagates():
 
     with pytest.raises(TournamentCompleteError):
         t.pair()
+
+
+def test_constructor_rejects_invalid_pairing_dependency():
+    with pytest.raises(TournamentConfigurationError, match="pairing must be an instance"):
+        Tournament(pairing=object(), scoring=PokemonTCG())  # type: ignore[arg-type]
+
+
+def test_constructor_rejects_invalid_scoring_dependency():
+    with pytest.raises(TournamentConfigurationError, match="scoring must be an instance"):
+        Tournament(pairing=Swiss(make_players(2)), scoring=object())  # type: ignore[arg-type]

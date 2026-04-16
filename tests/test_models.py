@@ -2,8 +2,15 @@
 
 import pytest
 
-from cardarena_tournament_core.errors import TournamentCompleteError
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Standing, Round, Team
+from cardarena_tournament_core.common.errors import (
+    MatchupValidationError,
+    ParticipantValidationError,
+    RoundValidationError,
+    StandingValidationError,
+    TeamValidationError,
+    TournamentCompleteError,
+)
+from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Player, Standing, Round, Team
 
 
 # Player Tests
@@ -14,12 +21,12 @@ def test_player_fields():
 
 
 def test_player_empty_id_raises_error():
-    with pytest.raises(ValueError, match="Player id cannot be empty"):
+    with pytest.raises(ParticipantValidationError, match="Player id cannot be empty"):
         Player(id="", name="Alice")
 
 
 def test_player_empty_name_raises_error():
-    with pytest.raises(ValueError, match="Player name cannot be empty"):
+    with pytest.raises(ParticipantValidationError, match="Player name cannot be empty"):
         Player(id="p1", name="")
 
 
@@ -32,17 +39,17 @@ def test_team_fields():
 
 
 def test_team_empty_id_raises_error():
-    with pytest.raises(ValueError, match="Team id cannot be empty"):
+    with pytest.raises(TeamValidationError, match="Team id cannot be empty"):
         Team(id="", name="Team", members=("Alice",))
 
 
 def test_team_empty_name_raises_error():
-    with pytest.raises(ValueError, match="Team name cannot be empty"):
+    with pytest.raises(TeamValidationError, match="Team name cannot be empty"):
         Team(id="t1", name="", members=("Alice",))
 
 
 def test_team_empty_members_raises_error():
-    with pytest.raises(ValueError, match="Team must have at least one member"):
+    with pytest.raises(TeamValidationError, match="Team must have at least one member"):
         Team(id="t1", name="Team", members=())
 
 
@@ -69,15 +76,17 @@ def test_matchup_is_bye_property():
 
 def test_matchup_is_complete_property():
     p1, p2 = Player(id="p1", name="Alice"), Player(id="p2", name="Bob")
+    bye = Matchup(player1=p1, player2=None)
     pending = Matchup(player1=p1, player2=p2)
     complete = Matchup(player1=p1, player2=p2, outcome=MatchupOutcome.PLAYER1_WINS)
+    assert bye.is_complete is True
     assert pending.is_complete is False
     assert complete.is_complete is True
 
 
 def test_matchup_cannot_match_player_against_self():
     p = Player(id="p1", name="Alice")
-    with pytest.raises(ValueError, match="A participant cannot be matched against themselves"):
+    with pytest.raises(MatchupValidationError, match="A participant cannot be matched against themselves"):
         Matchup(player1=p, player2=p)
 
 
@@ -95,7 +104,7 @@ def test_round_accepts_matchups():
 
 
 def test_round_number_must_be_positive():
-    with pytest.raises(ValueError, match="round_number must be >= 1"):
+    with pytest.raises(RoundValidationError, match="round_number must be >= 1"):
         Round(round_number=0)
 
 
@@ -154,7 +163,7 @@ def test_matchup_team_bye():
 
 def test_matchup_cannot_match_team_against_itself():
     team = Team(id="t1", name="Alpha", members=("Alice",))
-    with pytest.raises(ValueError, match="A participant cannot be matched against themselves"):
+    with pytest.raises(MatchupValidationError, match="A participant cannot be matched against themselves"):
         Matchup(player1=team, player2=team)
 
 
@@ -194,5 +203,11 @@ def test_player_standing_with_tiebreakers():
 
 def test_player_standing_points_cannot_be_negative():
     p = Player(id="p1", name="Alice")
-    with pytest.raises(ValueError, match="points cannot be negative"):
+    with pytest.raises(StandingValidationError, match="points cannot be negative"):
         Standing(player=p, points=-1, rank=1)
+
+
+def test_player_standing_rank_cannot_be_negative():
+    p = Player(id="p1", name="Alice")
+    with pytest.raises(StandingValidationError, match="rank cannot be negative"):
+        Standing(player=p, points=0, rank=-1)

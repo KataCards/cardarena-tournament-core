@@ -9,14 +9,35 @@ description = "General-purpose tournament engine: Swiss pairing, Round Robin, El
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MPL 2.0" }
+authors = [{ name = "KataCards" }]
+maintainers = [{ name = "KataCards" }]
 keywords = ["tournament", "swiss", "pairing", "tcg", "scoring"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/KataCards/cardarena-tournament-core"
+Repository = "https://github.com/KataCards/cardarena-tournament-core"
+Issues = "https://github.com/KataCards/cardarena-tournament-core/issues"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "pytest-cov",
+    "pytest-cov>=6.0",
     "ruff>=0.15.10",
+    "mypy>=1.14",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -24,6 +45,22 @@ packages = ["cardarena_tournament_core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=cardarena_tournament_core --cov-report=term-missing --cov-fail-under=98"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = true
+disallow_untyped_calls = false
+disallow_incomplete_defs = false
+no_implicit_optional = false
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

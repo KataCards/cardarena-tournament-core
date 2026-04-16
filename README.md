@@ -16,7 +16,7 @@ No Django. No ORM. No dependencies. Pure Python 3.11+.
 - **Round Robin** — full schedule via the Berger circle method; even and odd player counts
 - **Single Elimination** — mirrored seeding (1 vs N, 2 vs N-1, …), automatic bye advancement
 - **Pokémon TCG scoring** — Win/Draw/Loss/Bye points + OWP and OOWP tiebreakers (floor 25 %)
-- **Yu-Gi-Oh! TCG scoring** — same points + XXYYYZZZ encoded tiebreak number for single-value sorting
+- **Yu-Gi-Oh! TCG scoring** — same points + OWP and OOWP tiebreakers (no floor)
 - **Extensible** — subclass `BasePairing` or `BaseScoring` to add your own format
 - **Fully typed** — ships a `py.typed` marker; works with mypy and pyright out of the box
 
@@ -155,11 +155,10 @@ for standing in standings:
     print(
         f"{standing.rank}. {standing.player.name} — "
         f"{standing.points} pts  "
-        f"tiebreak={standing.tiebreakers['tiebreak_number']}"
+        f"OWP={standing.tiebreakers['owp']:.3f}  "
+        f"OOWP={standing.tiebreakers['oowp']:.3f}"
     )
 ```
-
-The tiebreak number encodes `XXYYYZZZ`: XX = points, YYY = OWP × 1000, ZZZ = OOWP × 1000 — so a single integer comparison gives the correct final ordering.
 
 ### Teams
 
@@ -212,23 +211,27 @@ class ChessScoring(BaseScoring):
 
 ```
 cardarena_tournament_core/
-├── models.py               # Player, Team, Matchup, Round, Standing, TournamentCompleteError
+├── __init__.py             # Public API
+├── common/
+│   ├── __init__.py
+│   ├── errors.py           # Semantic exception hierarchy
+│   └── models.py           # Core data models
+├── errors.py               # Legacy compatibility re-export
+├── models.py               # Legacy compatibility re-export
 ├── tournament.py           # Tournament orchestrator
+├── utils.py                # Win%, OWP, OOWP helpers
 ├── py.typed                # PEP 561 typed package marker
 ├── pairings/
-│   ├── base/
-│   │   └── __init__.py     # BasePairing ABC
+│   ├── __init__.py
+│   ├── base.py             # BasePairing ABC
 │   ├── swiss.py
 │   ├── round_robin.py
 │   └── elimination.py
 └── scoring/
-    ├── base/
-    │   └── __init__.py     # BaseScoring ABC
-    └── tcg/
-        ├── __init__.py     # re-exports TCGBaseScoring, PokemonTCG, YuGiOh
-        ├── base_tcg.py     # TCGBaseScoring — shared OWP/OOWP helpers (internal)
-        ├── pokemon_tcg.py
-        └── yugioh_tcg.py
+    ├── __init__.py
+    ├── base.py             # BaseScoring and shared TCG scoring helpers
+    ├── pokemon.py
+    └── yugioh.py
 ```
 
 ---
@@ -260,11 +263,13 @@ from cardarena_tournament_core import (
 ```bash
 git clone https://github.com/KataCards/cardarena-tournament-core
 cd cardarena-tournament-core
-pip install -e ".[dev]"
-pytest
+uv sync --extra dev
+uv run ruff check .
+uv run mypy cardarena_tournament_core tests
+uv run pytest
 ```
 
-Dev dependencies: `pytest`, `pytest-cov`, `ruff`.
+Dev dependencies include `pytest`, `pytest-cov`, `ruff`, and `mypy`.
 
 ---
 

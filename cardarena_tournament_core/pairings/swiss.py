@@ -1,6 +1,10 @@
 from collections.abc import Sequence
 
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round
+from cardarena_tournament_core.common.errors import (
+    PairingConfigurationError,
+    PairingStateError,
+)
+from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Participant, Round
 from cardarena_tournament_core.pairings.base import BasePairing
 from cardarena_tournament_core import utils
 
@@ -19,21 +23,47 @@ class Swiss(BasePairing):
     Both current TCG presets (PokemonTCG, YuGiOh) use the same values.
     """
 
-    WIN_POINTS: int = 3
-    DRAW_POINTS: int = 1
-    BYE_POINTS: int = 3
+    DEFAULT_WIN_POINTS: int = 3
+    DEFAULT_DRAW_POINTS: int = 1
+    DEFAULT_BYE_POINTS: int = 3
 
     def __init__(
         self,
         participants: Sequence[Participant],
         use_tiebreaker_sort: bool = False,
+        win_points: int = DEFAULT_WIN_POINTS,
+        draw_points: int = DEFAULT_DRAW_POINTS,
+        bye_points: int = DEFAULT_BYE_POINTS,
+        tiebreaker_min_win_pct: float = 0.25,
     ) -> None:
         super().__init__(participants)
+
+        if win_points < 0 or draw_points < 0 or bye_points < 0:
+            raise PairingConfigurationError("Swiss point values must be non-negative.")
+        if draw_points > win_points:
+            raise PairingConfigurationError(
+                "draw_points cannot exceed win_points in Swiss pairing."
+            )
+        if bye_points > win_points:
+            raise PairingConfigurationError(
+                "bye_points cannot exceed win_points in Swiss pairing."
+            )
+        if not 0.0 <= tiebreaker_min_win_pct <= 1.0:
+            raise PairingConfigurationError(
+                "tiebreaker_min_win_pct must be within [0.0, 1.0]."
+            )
+
         self._points: dict[str, int] = {participant.id: 0 for participant in participants}
         self._played_pairs: set[frozenset[str]] = set()
         self._use_tiebreaker_sort = use_tiebreaker_sort
+        self._win_points = win_points
+        self._draw_points = draw_points
+        self._bye_points = bye_points
+        self._tiebreaker_min_win_pct = tiebreaker_min_win_pct
 
-    # ── public interface ──────────────────────────────────────────────────────
+    # ----
+    # Public interface
+    # ----
 
     def pair(self) -> Round:
         """Generate the next round's matchups.
@@ -71,20 +101,26 @@ class Swiss(BasePairing):
         """Record outcomes and update points and pairing history."""
         for matchup in completed_round.matchups:
             if matchup.player2 is None:
-                self._points[matchup.player1.id] += self.BYE_POINTS
+                self._points[matchup.player1.id] += self._bye_points
             elif matchup.outcome == MatchupOutcome.PLAYER1_WINS:
-                self._points[matchup.player1.id] += self.WIN_POINTS
+                self._points[matchup.player1.id] += self._win_points
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
             elif matchup.outcome == MatchupOutcome.PLAYER2_WINS:
-                self._points[matchup.player2.id] += self.WIN_POINTS
+                self._points[matchup.player2.id] += self._win_points
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
             elif matchup.outcome == MatchupOutcome.DRAW:
-                self._points[matchup.player1.id] += self.DRAW_POINTS
-                self._points[matchup.player2.id] += self.DRAW_POINTS
+                self._points[matchup.player1.id] += self._draw_points
+                self._points[matchup.player2.id] += self._draw_points
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
+            else:
+                raise PairingStateError(
+                    "Swiss matchups must resolve to PLAYER1_WINS, PLAYER2_WINS, or DRAW."
+                )
         super().submit_results(completed_round)
 
-    # ── private helpers ───────────────────────────────────────────────────────
+    # ----
+    # Private helpers
+    # ----
 
     def _rank_participants(self) -> list[Participant]:
         if self._use_tiebreaker_sort and self._rounds:
@@ -92,8 +128,16 @@ class Swiss(BasePairing):
                 self.participants,
                 key=lambda participant: (
                     self._points[participant.id],
-                    utils.owp(participant.id, self._rounds, min_win_pct=0.25),
-                    utils.oowp(participant.id, self._rounds, min_win_pct=0.25),
+                    utils.owp(
+                        participant.id,
+                        self._rounds,
+                        min_win_pct=self._tiebreaker_min_win_pct,
+                    ),
+                    utils.oowp(
+                        participant.id,
+                        self._rounds,
+                        min_win_pct=self._tiebreaker_min_win_pct,
+                    ),
                 ),
                 reverse=True,
             )

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
-from cardarena_tournament_core.errors import TournamentCompleteError
-from cardarena_tournament_core.models import Matchup, Participant, Player, Round
+from cardarena_tournament_core.common.errors import TournamentCompleteError
+from cardarena_tournament_core.common.models import Matchup, Participant, Player, Round
 from cardarena_tournament_core.pairings.base import BasePairing
 
 _BYE_PLAYER = Player(id="__bye__", name="BYE")
@@ -22,6 +22,10 @@ class RoundRobin(BasePairing):
             self._build_schedule()
         )
 
+    # ----
+    # Public interface
+    # ----
+
     def pair(self) -> Round:
         """Return the pre-computed matchups for the next round.
 
@@ -39,7 +43,17 @@ class RoundRobin(BasePairing):
         ]
         return Round(round_number=next_round_number, matchups=matchups)
 
-    # ── private helpers ───────────────────────────────────────────────────────
+    # ----
+    # Private helpers
+    # ----
+
+    def _resolve_bye(self, participant_a: Participant, participant_b: Participant) -> tuple[Participant, Participant | None]:
+        """Return a ``(player1, player2)`` pair, replacing the phantom BYE with ``None``."""
+        if participant_b.id == _BYE_PLAYER.id:
+            return (participant_a, None)
+        if participant_a.id == _BYE_PLAYER.id:
+            return (participant_b, None)
+        return (participant_a, participant_b)
 
     def _build_schedule(self) -> list[list[tuple[Participant, Participant | None]]]:
         """Pre-compute all rounds using the circle method.
@@ -63,14 +77,14 @@ class RoundRobin(BasePairing):
 
             # Fixed participant always plays the last participant in the rotating list
             round_pairs.append(
-                _resolve_bye(fixed_participant, rotating_participants[-1])
+                self._resolve_bye(fixed_participant, rotating_participants[-1])
             )
 
             # Pair remaining participants: front half vs mirrored back half
             for seat_index in range(player_count // 2 - 1):
                 mirror_index = player_count - 3 - seat_index
                 round_pairs.append(
-                    _resolve_bye(rotating_participants[seat_index], rotating_participants[mirror_index])
+                    self._resolve_bye(rotating_participants[seat_index], rotating_participants[mirror_index])
                 )
 
             schedule.append(round_pairs)
@@ -80,13 +94,3 @@ class RoundRobin(BasePairing):
         return schedule
 
 
-def _resolve_bye(
-    participant_a: Participant,
-    participant_b: Participant,
-) -> tuple[Participant, Participant | None]:
-    """Return a ``(player1, player2)`` pair, replacing the phantom BYE with ``None``."""
-    if participant_b.id == _BYE_PLAYER.id:
-        return (participant_a, None)
-    if participant_a.id == _BYE_PLAYER.id:
-        return (participant_b, None)
-    return (participant_a, participant_b)

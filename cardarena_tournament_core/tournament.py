@@ -1,6 +1,7 @@
 """Tournament orchestrator — wires a pairing format to a scoring system."""
 
-from cardarena_tournament_core.models import Participant, Round, Standing
+from cardarena_tournament_core.common.errors import TournamentConfigurationError
+from cardarena_tournament_core.common.models import Participant, Round, Standing
 from cardarena_tournament_core.pairings.base import BasePairing
 from cardarena_tournament_core.scoring.base import BaseScoring
 
@@ -39,10 +40,21 @@ class Tournament:
     """
 
     def __init__(self, pairing: BasePairing, scoring: BaseScoring) -> None:
-        self._pairing = pairing
-        self._scoring = scoring
+        if not isinstance(pairing, BasePairing):
+            raise TournamentConfigurationError(
+                "pairing must be an instance of BasePairing."
+            )
+        if not isinstance(scoring, BaseScoring):
+            raise TournamentConfigurationError(
+                "scoring must be an instance of BaseScoring."
+            )
 
-    # ── pairing delegation ────────────────────────────────────────────────────
+        self._pairing: BasePairing = pairing
+        self._scoring: BaseScoring = scoring
+
+    # ----
+    # Pairing delegation
+    # ----
 
     def pair(self) -> Round:
         """Generate and return the next round's matchups.
@@ -64,7 +76,9 @@ class Tournament:
         """
         self._pairing.submit_results(completed_round)
 
-    # ── scoring ───────────────────────────────────────────────────────────────
+    # ----
+    # Scoring
+    # ----
 
     def standings(self) -> list[Standing]:
         """Compute and return current standings.
@@ -75,7 +89,9 @@ class Tournament:
         """
         return self._scoring.calculate(self._pairing.rounds)
 
-    # ── read-only views ───────────────────────────────────────────────────────
+    # ----
+    # Read-only views
+    # ----
 
     @property
     def participants(self) -> list[Participant]:

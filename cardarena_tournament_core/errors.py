@@ -1,14 +1,39 @@
-"""Tournament-specific exceptions."""
+"""Backward-compatible re-exports for legacy error imports."""
 
+from cardarena_tournament_core.common.errors import (
+	CardArenaError,
+	ConfigurationError,
+	IncompleteRoundError,
+	MatchupValidationError,
+	PairingConfigurationError,
+	PairingStateError,
+	ParticipantValidationError,
+	RoundValidationError,
+	ScoringError,
+	ScoringValidationError,
+	StandingValidationError,
+	StateError,
+	TeamValidationError,
+	TournamentCompleteError,
+	TournamentConfigurationError,
+	ValidationError,
+)
 
-class TournamentCompleteError(Exception):
-    """Raised when ``pair()`` is called but the tournament has already concluded.
-
-    This can happen in two situations:
-    - :class:`RoundRobin`: all pre-scheduled rounds have been played.
-    - :class:`SingleElimination`: a champion has been determined (only one
-      active participant remains) or all participants have been eliminated.
-    """
-
-
-__all__ = ["TournamentCompleteError"]
+__all__ = [
+	"CardArenaError",
+	"ConfigurationError",
+	"ValidationError",
+	"StateError",
+	"ParticipantValidationError",
+	"TeamValidationError",
+	"MatchupValidationError",
+	"RoundValidationError",
+	"StandingValidationError",
+	"TournamentConfigurationError",
+	"PairingConfigurationError",
+	"PairingStateError",
+	"TournamentCompleteError",
+	"ScoringError",
+	"ScoringValidationError",
+	"IncompleteRoundError",
+]

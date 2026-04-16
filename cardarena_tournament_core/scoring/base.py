@@ -1,9 +1,14 @@
 """Base classes for tournament scoring systems."""
 
 from abc import ABC, abstractmethod
+from typing import ClassVar
 
-from cardarena_tournament_core.models import MatchupOutcome, Participant, Round, Standing
 from cardarena_tournament_core import utils
+from cardarena_tournament_core.common.errors import (
+    IncompleteRoundError,
+    ScoringValidationError,
+)
+from cardarena_tournament_core.common.models import MatchupOutcome, Participant, Round, Standing
 
 
 class BaseScoring(ABC):
@@ -37,10 +42,39 @@ class TCGBaseScoring(BaseScoring):
         BYE_POINTS: Points awarded for a bye.
     """
 
-    WIN_POINTS: int
-    DRAW_POINTS: int
-    LOSS_POINTS: int
-    BYE_POINTS: int
+    WIN_POINTS: ClassVar[int] = 0
+    DRAW_POINTS: ClassVar[int] = 0
+    LOSS_POINTS: ClassVar[int] = 0
+    BYE_POINTS: ClassVar[int] = 0
+
+    # ----
+    # Validation helpers
+    # ----
+
+    def _validate_rounds_for_scoring(self, rounds: list[Round]) -> None:
+        seen_round_numbers: set[int] = set()
+        for tournament_round in rounds:
+            if tournament_round.round_number in seen_round_numbers:
+                raise ScoringValidationError(
+                    "Round numbers must be unique when calculating standings. "
+                    f"Found duplicate round number {tournament_round.round_number}."
+                )
+            seen_round_numbers.add(tournament_round.round_number)
+
+            if not tournament_round.matchups:
+                raise ScoringValidationError(
+                    f"Round {tournament_round.round_number} must contain at least one matchup."
+                )
+
+            if not tournament_round.is_complete:
+                raise IncompleteRoundError(
+                    "Cannot calculate standings with incomplete rounds. "
+                    f"Round {tournament_round.round_number} has unresolved matchups."
+                )
+
+    # ----
+    # Shared calculations
+    # ----
 
     def _collect_players(self, rounds: list[Round]) -> dict[str, Participant]:
         """Build an ``{id: participant}`` map from every matchup across all rounds."""
@@ -80,6 +114,11 @@ class TCGBaseScoring(BaseScoring):
                 elif matchup.outcome == MatchupOutcome.DRAW:
                     points_by_player[matchup.player1.id] += self.DRAW_POINTS
                     points_by_player[matchup.player2.id] += self.DRAW_POINTS
+                else:
+                    raise ScoringValidationError(
+                        "Cannot score matchup with unresolved outcome. "
+                        "All non-bye matchups must be complete."
+                    )
 
         return points_by_player
 
@@ -105,3 +144,49 @@ class TCGBaseScoring(BaseScoring):
             for player_id in player_ids
         }
         return owp_by_player, oowp_by_player
+
+    def _build_standings(self, rounds: list[Round], *, min_win_pct: float) -> list[Standing]:
+        """Create sorted standings for TCG formats.
+
+        Sort order: points desc, OWP desc, OOWP desc, player.id asc.
+        """
+        if not rounds:
+            return []
+
+        self._validate_rounds_for_scoring(rounds)
+
+        player_map = self._collect_players(rounds)
+        points_by_player = self._calculate_points(rounds)
+        player_ids = list(player_map.keys())
+        owp_by_player, oowp_by_player = self._calculate_tiebreakers(
+            player_ids,
+            rounds,
+            min_win_pct=min_win_pct,
+        )
+
+        standings: list[Standing] = [
+            Standing(
+                player=player_map[player_id],
+                points=points_by_player[player_id],
+                rank=0,
+                tiebreakers={
+                    "owp": owp_by_player[player_id],
+                    "oowp": oowp_by_player[player_id],
+                },
+            )
+            for player_id in player_ids
+        ]
+
+        standings.sort(
+            key=lambda standing: (
+                -standing.points,
+                -standing.tiebreakers["owp"],
+                -standing.tiebreakers["oowp"],
+                standing.player.id,
+            )
+        )
+
+        for rank, standing in enumerate(standings, start=1):
+            standing.rank = rank
+
+        return standings
