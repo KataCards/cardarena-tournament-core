@@ -264,3 +264,53 @@ def test_submit_results_handles_draw_path():
     swiss.submit_results(round1)
 
     assert len(swiss.rounds) == 1
+
+
+def test_removed_player_excluded_from_future_pairings():
+    """After removing a player, they must not appear in any subsequent round."""
+    players = make_players(4)
+    swiss = Swiss(players)
+    round1 = swiss.pair()
+    for m in round1.matchups:
+        if m.player2 is not None:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss.submit_results(round1)
+
+    swiss.remove_active_participant("3")  # remove player with id "3"
+
+    round2 = swiss.pair()
+    round2_ids = {m.player1.id for m in round2.matchups}
+    round2_ids |= {m.player2.id for m in round2.matchups if m.player2 is not None}
+    assert "3" not in round2_ids
+
+
+def test_already_paired_round_submittable_after_removal():
+    """Pairing a round then removing a participant must not block submission."""
+    players = make_players(4)
+    swiss = Swiss(players)
+
+    round1 = swiss.pair()       # snapshot taken with all 4 active
+    swiss.remove_active_participant("0")  # remove after pairing
+
+    for m in round1.matchups:
+        if m.player2 is not None:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss.submit_results(round1)  # must succeed despite removal
+    assert len(swiss.rounds) == 1
+
+
+def test_removal_preserves_points_and_play_history():
+    """Points and played-pair history for a removed player are unaffected."""
+    p0, p1, p2, p3 = make_players(4)
+    swiss = Swiss([p0, p1, p2, p3])
+    round1 = swiss.pair()
+    for m in round1.matchups:
+        if m.player2 is not None:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss.submit_results(round1)
+
+    points_before = swiss._points["0"]
+    swiss.remove_active_participant("0")
+    assert swiss._points["0"] == points_before
+    # played_pairs must still record the pair that included "0"
+    assert any("0" in pair for pair in swiss._played_pairs)

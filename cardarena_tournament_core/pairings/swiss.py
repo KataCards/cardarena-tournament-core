@@ -77,8 +77,10 @@ class Swiss(BasePairing):
         is enabled and at least one round has been played, equal-point players
         are further sorted by OWP then OOWP.  Each player is then greedily
         paired with the highest-ranked available opponent they haven't yet faced.
-        Odd players out receive a bye.
+        Odd players out receive a bye.  Only active participants (not removed via
+        ``remove_active_participant``) are considered as pairing candidates.
         """
+        round_number = len(self._rounds) + 1
         ranked_participants = self._rank_participants()
         already_paired: set[str] = set()
         matchups: list[Matchup] = []
@@ -100,7 +102,8 @@ class Swiss(BasePairing):
                 matchups.append(Matchup(player1=participant, player2=None))
                 already_paired.add(participant.id)
 
-        return Round(round_number=len(self._rounds) + 1, matchups=matchups)
+        self._register_round_snapshot(round_number)
+        return Round(round_number=round_number, matchups=matchups)
 
     def submit_results(self, completed_round: Round) -> None:
         """Record outcomes and update points and pairing history."""
@@ -128,9 +131,10 @@ class Swiss(BasePairing):
     # -------------------------------------------------------------------------
 
     def _rank_participants(self) -> list[Participant]:
+        active_participants = [p for p in self._participants if p.id in self._active_ids]
         if self._use_tiebreaker_sort and self._rounds:
             return sorted(
-                self.participants,
+                active_participants,
                 key=lambda participant: (
                     self._points[participant.id],
                     utils.owp(
@@ -147,7 +151,7 @@ class Swiss(BasePairing):
                 reverse=True,
             )
         return sorted(
-            self.participants,
+            active_participants,
             key=lambda participant: self._points[participant.id],
             reverse=True,
         )
