@@ -294,7 +294,7 @@ Use `Swiss` pairing if your tournament requires dropping participants mid-event.
 
 ### Example: Mid-Tournament Drop (Swiss)
 
-~~~python
+```python
 from cardarena_tournament_core import Player, MatchupOutcome, Swiss, PokemonTCG, Tournament
 
 players = [Player(id=str(i), name=f"Player {i}") for i in range(8)]
@@ -315,7 +315,7 @@ round2 = tournament.pair()
 
 # Standings still include Player 7's round 1 result
 standings = tournament.standings()
-~~~
+```
 
 ---
 
@@ -338,4 +338,4 @@ Dev dependencies include `pytest`, `pytest-cov`, `ruff`, and `mypy`.
 
 Mozilla Public License 2.0 — see [LICENSE](LICENSE).
 
-Part of the [CardArena](https://github.com/KataCards) open-source ecosystem, maintained by KataCards.
+Part of the [CardArena](https://github.com/KataCards) ecosystem, maintained by KataCards.
