@@ -1,4 +1,4 @@
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Round
+from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Player, Round
 from cardarena_tournament_core.scoring.pokemon import PokemonTCG
 
 

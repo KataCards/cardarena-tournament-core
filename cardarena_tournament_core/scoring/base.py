@@ -18,6 +18,10 @@ class BaseScoring(ABC):
     ordered list of :class:`~cardarena_tournament_core.models.Standing` objects.
     """
 
+    #------------------------------------------------------------------------
+    # Calculation interface
+    #------------------------------------------------------------------------
+
     @abstractmethod
     def calculate(self, rounds: list[Round]) -> list[Standing]:
         """Compute and return standings from the given completed rounds.
@@ -47,9 +51,9 @@ class TCGBaseScoring(BaseScoring):
     LOSS_POINTS: ClassVar[int] = 0
     BYE_POINTS: ClassVar[int] = 0
 
-    # ----
-    # Validation helpers
-    # ----
+    # -------------------------------------------------------------------------
+    # Validation helpers / Private functions
+    # -------------------------------------------------------------------------
 
     def _validate_rounds_for_scoring(self, rounds: list[Round]) -> None:
         seen_round_numbers: set[int] = set()
@@ -72,9 +76,9 @@ class TCGBaseScoring(BaseScoring):
                     f"Round {tournament_round.round_number} has unresolved matchups."
                 )
 
-    # ----
-    # Shared calculations
-    # ----
+    # -------------------------------------------------------------------------
+    # Shared calculations / Private functions
+    # -------------------------------------------------------------------------
 
     def _collect_players(self, rounds: list[Round]) -> dict[str, Participant]:
         """Build an ``{id: participant}`` map from every matchup across all rounds."""

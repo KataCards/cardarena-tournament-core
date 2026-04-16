@@ -17,13 +17,18 @@ class PokemonTCG(TCGBaseScoring):
         1. OWP  — Opponents' Win Percentage
         2. OOWP — Opponents' Opponents' Win Percentage
 
-    Win percentages are floored at 25 % per official rules.
+    Win percentages are floored at 25 % per official rules. Output standings are sorted by points, then OWP, then OOWP in percentage.
+    This means that a player with 3 points and 25% OWP would rank above
     """
 
     WIN_POINTS: ClassVar[int] = 3
     DRAW_POINTS: ClassVar[int] = 1
     LOSS_POINTS: ClassVar[int] = 0
     BYE_POINTS: ClassVar[int] = 3
+
+    # ------------------------------------------------------------------------
+    # Calculation interface
+    # ------------------------------------------------------------------------
 
     def calculate(self, rounds: list[Round]) -> list[Standing]:
         """Return standings sorted by points, OWP, then OOWP."""

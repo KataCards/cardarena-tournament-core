@@ -39,6 +39,10 @@ class Tournament:
             print(f"{standing.rank}. {standing.player.name} — {standing.points} pts")
     """
 
+    # -------------------------------------------------------------------------
+    # Initialization and configuration
+    # -------------------------------------------------------------------------
+
     def __init__(self, pairing: BasePairing, scoring: BaseScoring) -> None:
         if not isinstance(pairing, BasePairing):
             raise TournamentConfigurationError(
@@ -52,9 +56,10 @@ class Tournament:
         self._pairing: BasePairing = pairing
         self._scoring: BaseScoring = scoring
 
-    # ----
+    # -------------------------------------------------------------------------
     # Pairing delegation
-    # ----
+    # -------------------------------------------------------------------------
+
 
     def pair(self) -> Round:
         """Generate and return the next round's matchups.
@@ -76,9 +81,9 @@ class Tournament:
         """
         self._pairing.submit_results(completed_round)
 
-    # ----
-    # Scoring
-    # ----
+    # -------------------------------------------------------------------------
+    # Scoring delegation
+    # -------------------------------------------------------------------------
 
     def standings(self) -> list[Standing]:
         """Compute and return current standings.
@@ -89,9 +94,9 @@ class Tournament:
         """
         return self._scoring.calculate(self._pairing.rounds)
 
-    # ----
+    # -------------------------------------------------------------------------
     # Read-only views
-    # ----
+    # -------------------------------------------------------------------------
 
     @property
     def participants(self) -> list[Participant]:

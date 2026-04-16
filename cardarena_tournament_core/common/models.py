@@ -12,9 +12,9 @@ from cardarena_tournament_core.common.errors import (
 )
 
 
-# ----
+# -------------------------------------------------------------------------
 # Match outcome model
-# ----
+# -------------------------------------------------------------------------
 
 class MatchupOutcome(str, Enum):
     """Possible outcomes of a tournament matchup."""
@@ -24,6 +24,10 @@ class MatchupOutcome(str, Enum):
     PLAYER2_WINS = "player2_wins"
     DRAW = "draw"
 
+
+# -------------------------------------------------------------------------
+# Participant models
+# -------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Player:
@@ -59,6 +63,10 @@ class Team:
 # Either an individual player or a team can participate in a tournament.
 Participant = Player | Team
 
+
+# -------------------------------------------------------------------------
+# Management models
+# -------------------------------------------------------------------------
 
 @dataclass
 class Matchup:

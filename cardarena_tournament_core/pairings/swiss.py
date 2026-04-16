@@ -27,6 +27,11 @@ class Swiss(BasePairing):
     DEFAULT_DRAW_POINTS: int = 1
     DEFAULT_BYE_POINTS: int = 3
 
+
+    # -------------------------------------------------------------------------
+    # Initialization and configuration
+    # -------------------------------------------------------------------------
+
     def __init__(
         self,
         participants: Sequence[Participant],
@@ -61,9 +66,9 @@ class Swiss(BasePairing):
         self._bye_points = bye_points
         self._tiebreaker_min_win_pct = tiebreaker_min_win_pct
 
-    # ----
-    # Public interface
-    # ----
+    # -------------------------------------------------------------------------
+    # Pairing / Submission interface
+    # -------------------------------------------------------------------------
 
     def pair(self) -> Round:
         """Generate the next round's matchups.
@@ -118,9 +123,9 @@ class Swiss(BasePairing):
                 )
         super().submit_results(completed_round)
 
-    # ----
+    # -------------------------------------------------------------------------
     # Private helpers
-    # ----
+    # -------------------------------------------------------------------------
 
     def _rank_participants(self) -> list[Participant]:
         if self._use_tiebreaker_sort and self._rounds:

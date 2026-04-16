@@ -17,6 +17,10 @@ class BasePairing(ABC):
     at the end of any override so the round history stays consistent.
     """
 
+    # -------------------------------------------------------------------------
+    # Initialization and validation
+    # -------------------------------------------------------------------------
+
     def __init__(self, participants: Sequence[Participant]) -> None:
         participant_list = list(participants)
         if not participant_list:
@@ -41,9 +45,9 @@ class BasePairing(ABC):
         self._participant_ids: set[str] = seen_ids
         self._rounds: list[Round] = []
 
-    # ----
+    # -------------------------------------------------------------------------
     # Internal validation
-    # ----
+    # -------------------------------------------------------------------------
 
     def _validate_round_submission(self, completed_round: Round) -> None:
         expected_round_number = len(self._rounds) + 1
@@ -73,6 +77,11 @@ class BasePairing(ABC):
                     f"{matchup.player2.id}."
                 )
 
+
+    # -------------------------------------------------------------------------
+    # Pairing / Submission interface
+    # -------------------------------------------------------------------------
+
     @abstractmethod
     def pair(self) -> Round:
         """Generate and return the next round's pairings."""
@@ -86,6 +95,11 @@ class BasePairing(ABC):
         """
         self._validate_round_submission(completed_round)
         self._rounds.append(completed_round)
+    
+
+    # -------------------------------------------------------------------------
+    # Read-only views
+    # -------------------------------------------------------------------------
 
     @property
     def participants(self) -> list[Participant]:

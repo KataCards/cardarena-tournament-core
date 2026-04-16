@@ -8,9 +8,9 @@ from cardarena_tournament_core.common.errors import ScoringValidationError
 from cardarena_tournament_core.common.models import MatchupOutcome, Round
 
 
-# ----
-# Validation helpers
-# ----
+# -------------------------------------------------------------------------
+# Validation helpers / Private functions
+# -------------------------------------------------------------------------
 
 def _validate_player_id(player_id: str) -> None:
     if not player_id:
@@ -20,6 +20,10 @@ def _validate_player_id(player_id: str) -> None:
 def _validate_min_win_pct(min_win_pct: float) -> None:
     if not 0.0 <= min_win_pct <= 1.0:
         raise ScoringValidationError("min_win_pct must be within [0.0, 1.0].")
+
+# -------------------------------------------------------------------------
+# Calculation helpers / ID Helper
+# -------------------------------------------------------------------------
 
 
 def win_percentage(player_id: str, rounds: list[Round], *, min_win_pct: float = 0.0) -> float:

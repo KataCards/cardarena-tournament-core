@@ -1,9 +1,10 @@
 """Exception hierarchy for cardarena_tournament_core."""
 
 
-# ----
+# -------------------------------------------------------------------------
 # Base categories
-# ----
+# -------------------------------------------------------------------------
+
 
 class CardArenaError(Exception):
   """Base class for all package-specific exceptions."""
@@ -21,9 +22,9 @@ class StateError(CardArenaError):
   """Raised when an operation is invalid for the current runtime state."""
 
 
-# ----
+# -------------------------------------------------------------------------
 # Model validation errors
-# ----
+# -------------------------------------------------------------------------
 
 class ParticipantValidationError(ValidationError):
   """Raised when a player or participant payload is invalid."""
@@ -45,9 +46,9 @@ class StandingValidationError(ValidationError):
   """Raised when a standing entry fails validation."""
 
 
-# ----
+# -------------------------------------------------------------------------
 # Pairing and tournament errors
-# ----
+# -------------------------------------------------------------------------
 
 class TournamentConfigurationError(ConfigurationError):
   """Raised when tournament dependencies are misconfigured."""
@@ -65,9 +66,9 @@ class TournamentCompleteError(PairingStateError):
   """Raised when ``pair()`` is called after a tournament has concluded."""
 
 
-# ----
+# -------------------------------------------------------------------------
 # Scoring errors
-# ----
+# -------------------------------------------------------------------------
 
 class ScoringError(CardArenaError):
   """Base class for scoring-specific failures."""

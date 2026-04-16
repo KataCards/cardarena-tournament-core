@@ -14,13 +14,18 @@ class SingleElimination(BasePairing):
     seed a bye (automatic advancement).
     """
 
+    # -------------------------------------------------------------------------
+    # Initialization and configuration
+    # -------------------------------------------------------------------------
+
     def __init__(self, participants: Sequence[Participant]) -> None:
         super().__init__(participants)
         self._active_participants: list[Participant] = list(participants)
 
-    # ----
-    # Public interface
-    # ----
+
+    # -------------------------------------------------------------------------
+    # Pairing / Submission interface
+    # -------------------------------------------------------------------------
 
     def pair(self) -> Round:
         """Generate matchups for the current elimination round.

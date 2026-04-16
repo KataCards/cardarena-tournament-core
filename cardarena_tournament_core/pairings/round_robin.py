@@ -16,15 +16,20 @@ class RoundRobin(BasePairing):
       (a phantom BYE participant is added internally).
     """
 
+    # -------------------------------------------------------------------------
+    # Initialization and configuration
+    # -------------------------------------------------------------------------
+
     def __init__(self, participants: Sequence[Participant]) -> None:
         super().__init__(participants)
         self._schedule: list[list[tuple[Participant, Participant | None]]] = (
             self._build_schedule()
         )
 
-    # ----
-    # Public interface
-    # ----
+
+    # -------------------------------------------------------------------------
+    # Pairing interface
+    # -------------------------------------------------------------------------
 
     def pair(self) -> Round:
         """Return the pre-computed matchups for the next round.
@@ -43,9 +48,10 @@ class RoundRobin(BasePairing):
         ]
         return Round(round_number=next_round_number, matchups=matchups)
 
-    # ----
+
+    # -------------------------------------------------------------------------
     # Private helpers
-    # ----
+    # -------------------------------------------------------------------------
 
     def _resolve_bye(self, participant_a: Participant, participant_b: Participant) -> tuple[Participant, Participant | None]:
         """Return a ``(player1, player2)`` pair, replacing the phantom BYE with ``None``."""
