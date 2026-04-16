@@ -1,5 +1,5 @@
 from cardarena_tournament_core.models import MatchupOutcome, Round, Standing
-from cardarena_tournament_core.scoring.base import TCGBaseScoring
+from cardarena_tournament_core.scoring.tcg.base_tcg import TCGBaseScoring
 
 
 class PokemonTCG(TCGBaseScoring):

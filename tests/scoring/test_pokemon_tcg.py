@@ -1,5 +1,5 @@
 from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Round
-from cardarena_tournament_core.scoring.pokemon_tcg import PokemonTCG
+from cardarena_tournament_core.scoring.tcg import PokemonTCG
 
 
 def _two_player_round(outcome: MatchupOutcome) -> list[Round]:
