@@ -6,7 +6,7 @@ shared by every TCG scoring class; it carries no TCG-specific rules itself.
 """
 
 from cardarena_tournament_core.models import MatchupOutcome, Participant, Round
-from cardarena_tournament_core.scoring.base.base import BaseScoring
+from cardarena_tournament_core.scoring.base import BaseScoring
 
 _MIN_WIN_PCT = 0.25
 
