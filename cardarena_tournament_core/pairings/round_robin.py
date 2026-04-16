@@ -1,4 +1,4 @@
-from cardarena_tournament_core.models import Matchup, Participant, Player, Round
+from cardarena_tournament_core.models import Matchup, Participant, Player, Round, TournamentCompleteError
 from cardarena_tournament_core.pairings.base import BasePairing
 
 _BYE_PLAYER = Player(id="__bye__", name="BYE")
@@ -20,8 +20,16 @@ class RoundRobin(BasePairing):
         )
 
     def pair(self) -> Round:
-        """Return the pre-computed matchups for the next round."""
+        """Return the pre-computed matchups for the next round.
+
+        Raises:
+            TournamentCompleteError: All scheduled rounds have been played.
+        """
         next_round_number = len(self._rounds) + 1
+        if next_round_number > len(self._schedule):
+            raise TournamentCompleteError(
+                f"All {len(self._schedule)} rounds of this round-robin have been played."
+            )
         scheduled_pairs = self._schedule[next_round_number - 1]
         matchups = [
             Matchup(player1=home, player2=away) for home, away in scheduled_pairs
