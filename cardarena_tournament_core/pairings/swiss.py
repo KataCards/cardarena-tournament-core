@@ -51,11 +51,11 @@ class Swiss(BasePairing):
             if participant.id in already_paired:
                 continue
 
-            opponent = self._find_fresh_opponent(participant, ranked_participants, already_paired)
+            opponent = self._find_opponent(participant, ranked_participants, already_paired, allow_repeat=False)
 
             if opponent is None:
                 # No unplayed opponent available — allow a repeat rather than leaving unpaired
-                opponent = self._find_any_opponent(participant, ranked_participants, already_paired)
+                opponent = self._find_opponent(participant, ranked_participants, already_paired, allow_repeat=True)
 
             if opponent is not None:
                 matchups.append(Matchup(player1=participant, player2=opponent))
@@ -102,35 +102,30 @@ class Swiss(BasePairing):
             reverse=True,
         )
 
-    def _find_fresh_opponent(
+    def _find_opponent(
         self,
         participant: Participant,
         ranked_participants: list[Participant],
         already_paired: set[str],
+        *,
+        allow_repeat: bool,
     ) -> Participant | None:
-        return next(
-            (
-                candidate
-                for candidate in ranked_participants
-                if candidate.id not in already_paired
-                and candidate.id != participant.id
-                and frozenset([participant.id, candidate.id]) not in self._played_pairs
-            ),
-            None,
-        )
+        """Return the highest-ranked available opponent for *participant*.
 
-    def _find_any_opponent(
-        self,
-        participant: Participant,
-        ranked_participants: list[Participant],
-        already_paired: set[str],
-    ) -> Participant | None:
+        When ``allow_repeat`` is ``False``, only opponents not yet faced are
+        considered.  When ``True``, previously played opponents are also eligible
+        (used as a last resort to avoid leaving a player without a match).
+        """
         return next(
             (
                 candidate
                 for candidate in ranked_participants
                 if candidate.id not in already_paired
                 and candidate.id != participant.id
+                and (
+                    allow_repeat
+                    or frozenset([participant.id, candidate.id]) not in self._played_pairs
+                )
             ),
             None,
         )

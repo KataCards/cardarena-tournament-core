@@ -2,7 +2,7 @@
 
 import pytest
 
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Standing, Round, Team
+from cardarena_tournament_core.models import Matchup, MatchupOutcome, Player, Standing, Round, Team, TournamentCompleteError
 
 
 # Player Tests
@@ -133,6 +133,35 @@ def test_round_get_player_matchup():
     assert r.get_player_matchup("p3") == m2
     assert r.get_player_matchup("p4") == m2
     assert r.get_player_matchup("p99") is None
+
+
+# Team as Matchup participant
+def test_matchup_accepts_teams_as_participants():
+    team1 = Team(id="t1", name="Alpha", members=("Alice", "Bob"))
+    team2 = Team(id="t2", name="Beta", members=("Carol", "Dave"))
+    m = Matchup(player1=team1, player2=team2)
+    assert m.player1 == team1
+    assert m.player2 == team2
+    assert not m.is_bye
+
+
+def test_matchup_team_bye():
+    team = Team(id="t1", name="Alpha", members=("Alice",))
+    m = Matchup(player1=team, player2=None)
+    assert m.is_bye
+
+
+def test_matchup_cannot_match_team_against_itself():
+    team = Team(id="t1", name="Alpha", members=("Alice",))
+    with pytest.raises(ValueError, match="A participant cannot be matched against themselves"):
+        Matchup(player1=team, player2=team)
+
+
+# TournamentCompleteError
+def test_tournament_complete_error_is_exception():
+    err = TournamentCompleteError("done")
+    assert isinstance(err, Exception)
+    assert str(err) == "done"
 
 
 # Standing Tests

@@ -1,4 +1,6 @@
-from cardarena_tournament_core.models import MatchupOutcome, Player
+import pytest
+
+from cardarena_tournament_core.models import MatchupOutcome, Player, TournamentCompleteError
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 
 
@@ -67,6 +69,24 @@ def test_bye_player_advances_automatically():
     bye_m = next(m for m in r1.matchups if m.player2 is None)
     assert bye_m.player1.id in r2_player_ids
     assert real_m.player1.id in r2_player_ids
+
+
+def test_tournament_complete_error_when_champion_found():
+    players = make_players(2)
+    elim = SingleElimination(players)
+    r1 = elim.pair()
+    r1.matchups[0].outcome = MatchupOutcome.PLAYER1_WINS
+    elim.submit_results(r1)
+
+    with pytest.raises(TournamentCompleteError):
+        elim.pair()
+
+
+def test_tournament_complete_error_single_player():
+    elim = SingleElimination(make_players(1))
+
+    with pytest.raises(TournamentCompleteError):
+        elim.pair()
 
 
 def test_round_numbers_increment():

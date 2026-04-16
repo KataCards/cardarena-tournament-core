@@ -1,6 +1,8 @@
 from itertools import combinations
 
-from cardarena_tournament_core.models import MatchupOutcome, Player
+import pytest
+
+from cardarena_tournament_core.models import MatchupOutcome, Player, TournamentCompleteError
 from cardarena_tournament_core.pairings.round_robin import RoundRobin
 
 
@@ -53,6 +55,16 @@ def test_round_robin_round_numbers_increment():
         r = rr.pair()
         assert r.round_number == expected_num
         rr.submit_results(r)
+
+
+def test_tournament_complete_error_after_schedule_exhausted():
+    rr = RoundRobin(make_players(4))
+    for _ in range(3):
+        r = rr.pair()
+        rr.submit_results(r)
+
+    with pytest.raises(TournamentCompleteError):
+        rr.pair()
 
 
 def test_round_robin_5_players_each_pair_once():

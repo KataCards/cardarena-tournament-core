@@ -180,10 +180,14 @@ def test_bye_excluded_from_tiebreakers():
 def test_standings_sorted_by_points_then_tiebreak():
     """Standings should be sorted by points (desc), then tiebreak number (desc)."""
     standings = YuGiOh().calculate(_two_player_round(MatchupOutcome.PLAYER1_WINS))
-    
+
     # Winner should be ranked 1st
     assert standings[0].points >= standings[1].points
-    
+
     # If points are equal, higher tiebreak number should rank higher
     if standings[0].points == standings[1].points:
         assert standings[0].tiebreakers["tiebreak_number"] >= standings[1].tiebreakers["tiebreak_number"]
+
+
+def test_calculate_empty_rounds_returns_empty():
+    assert YuGiOh().calculate([]) == []

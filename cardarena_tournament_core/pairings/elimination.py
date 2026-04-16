@@ -1,4 +1,4 @@
-from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round
+from cardarena_tournament_core.models import Matchup, MatchupOutcome, Participant, Round, TournamentCompleteError
 from cardarena_tournament_core.pairings.base import BasePairing
 
 
@@ -20,8 +20,18 @@ class SingleElimination(BasePairing):
 
         Seeds are mirrored: the highest seed plays the lowest, the second
         highest plays the second lowest, and so on.
+
+        Raises:
+            TournamentCompleteError: A champion has been determined (one active
+                participant remains) or all participants have been eliminated.
         """
         active = self._active_participants
+        if len(active) <= 1:
+            if len(active) == 1:
+                raise TournamentCompleteError(
+                    f"{active[0].name} is the champion — the tournament is complete."
+                )
+            raise TournamentCompleteError("All participants have been eliminated.")
         half = len(active) // 2
 
         matchups: list[Matchup] = [

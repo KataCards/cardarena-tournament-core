@@ -109,3 +109,7 @@ def test_bye_excluded_from_tiebreakers():
         # No real opponents → OWP should be 0.0 (no opponents to average)
         assert s.tiebreakers["owp"] == 0.0
         assert s.tiebreakers["oowp"] == 0.0
+
+
+def test_calculate_empty_rounds_returns_empty():
+    assert PokemonTCG().calculate([]) == []

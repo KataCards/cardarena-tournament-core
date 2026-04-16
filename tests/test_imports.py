@@ -14,6 +14,7 @@ def test_import_from_package_root():
         SingleElimination,
         Swiss,
         Team,
+        TournamentCompleteError,
         YuGiOh,
     )
     assert Player is not None
@@ -23,6 +24,7 @@ def test_import_from_package_root():
     assert MatchupOutcome is not None
     assert Round is not None
     assert Standing is not None
+    assert TournamentCompleteError is not None
     assert Swiss is not None
     assert RoundRobin is not None
     assert SingleElimination is not None

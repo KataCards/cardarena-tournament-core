@@ -155,6 +155,15 @@ def test_tiebreaker_sort_ranks_higher_owp_player_first():
     )
 
 
+def test_single_player_receives_bye():
+    swiss = Swiss(make_players(1))
+    round1 = swiss.pair()
+
+    assert len(round1.matchups) == 1
+    assert round1.matchups[0].player2 is None
+    assert round1.matchups[0].player1.id == "0"
+
+
 def test_bye_player_receives_points():
     # Odd players: one gets bye. After submitting, bye player should have won.
     # We verify this indirectly: after bye round, next pairing uses updated standings.
