@@ -92,7 +92,7 @@ def test_tournament_complete_error_single_player():
 
 def test_tournament_complete_error_when_all_participants_eliminated():
     elim = SingleElimination(make_players(2))
-    elim._active_participants = []
+    elim._active_ids = set()  # clear active roster directly
 
     with pytest.raises(TournamentCompleteError, match="All participants have been eliminated"):
         elim.pair()
@@ -134,3 +134,49 @@ def test_player2_win_advances_player2():
 
     with pytest.raises(TournamentCompleteError, match="is the champion"):
         elim.pair()
+
+
+def test_active_ids_updated_after_submit():
+    """After submitting round 1, only winners remain active."""
+    players = make_players(4)
+    elim = SingleElimination(players)
+    r1 = elim.pair()
+    for m in r1.matchups:
+        m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim.submit_results(r1)
+
+    # P0 and P1 are winners (player1 wins in each matchup)
+    assert elim.active_participant_ids == frozenset({"0", "1"})
+
+
+def test_seeding_order_preserved_after_elimination():
+    """Active participants used in round 2 must respect original seeding order."""
+    players = make_players(4)  # seeds: P0=1, P1=2, P2=3, P3=4
+    elim = SingleElimination(players)
+
+    r1 = elim.pair()
+    # R1 pairs P0 vs P3 and P1 vs P2; P0 and P1 win
+    for m in r1.matchups:
+        m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim.submit_results(r1)
+
+    r2 = elim.pair()
+    assert len(r2.matchups) == 1
+    # P0 (seed 1) should be player1, P1 (seed 2) should be player2
+    assert r2.matchups[0].player1.id == "0"
+    assert r2.matchups[0].player2 is not None
+    assert r2.matchups[0].player2.id == "1"
+
+
+def test_already_paired_round_submittable_after_removal_in_elimination():
+    """Removing a player after pairing must not break submission of that round."""
+    players = make_players(4)
+    elim = SingleElimination(players)
+
+    r1 = elim.pair()           # snapshot taken with all 4 active
+    elim.remove_active_participant("3")  # remove after pairing
+
+    for m in r1.matchups:
+        m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim.submit_results(r1)    # must not raise
+    assert len(elim.rounds) == 1
