@@ -313,11 +313,13 @@ round2 = reconstructed.pair()
         # ... all rounds
     ],
     "active_participant_ids": ["0", "1", "2", "3", "4", "5", "6", "7"],
-    "win_points": 3,
-    "draw_points": 1,
-    "bye_points": 3,
-    "use_tiebreaker_sort": false,
-    "tiebreaker_min_win_pct": 0.25
+    "config": {
+        "win_points": 3,
+        "draw_points": 1,
+        "bye_points": 3,
+        "use_tiebreaker_sort": false,
+        "tiebreaker_min_win_pct": 0.25
+    }
 }
 ```
 
@@ -364,16 +366,19 @@ participants = [
 # Reconstruct rounds
 rounds = [Round.from_dict(r) for r in tournament_data["rounds"]]
 
+# Reconstruct Swiss config
+config = tournament_data.get("config", {})
+
 # Reconstruct Swiss state
 swiss = Swiss.from_history(
     participants=participants,
     rounds=rounds,
     active_participant_ids=set(tournament_data["active_participant_ids"]),
-    win_points=tournament_data.get("win_points", 3),
-    draw_points=tournament_data.get("draw_points", 1),
-    bye_points=tournament_data.get("bye_points", 3),
-    use_tiebreaker_sort=tournament_data.get("use_tiebreaker_sort", False),
-    tiebreaker_min_win_pct=tournament_data.get("tiebreaker_min_win_pct", 0.25)
+    win_points=config.get("win_points", 3),
+    draw_points=config.get("draw_points", 1),
+    bye_points=config.get("bye_points", 3),
+    use_tiebreaker_sort=config.get("use_tiebreaker_sort", False),
+    tiebreaker_min_win_pct=config.get("tiebreaker_min_win_pct", 0.25)
 )
 
 # Continue tournament
