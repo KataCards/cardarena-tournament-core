@@ -24,6 +24,8 @@ from cardarena_tournament_core.common.models import (
     Round,
     Standing,
     Team,
+    participant_from_dict,
+    participant_to_dict,
 )
 from cardarena_tournament_core.pairings import BasePairing, RoundRobin, SingleElimination, Swiss
 from cardarena_tournament_core.scoring import BaseScoring, PokemonTCG, YuGiOh
@@ -38,6 +40,9 @@ __all__ = [
     "MatchupOutcome",
     "Round",
     "Standing",
+    # Serialization helpers
+    "participant_to_dict",
+    "participant_from_dict",
     # Errors
     "CardArenaError",
     "ConfigurationError",
