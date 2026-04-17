@@ -123,3 +123,72 @@ def test_utils_reject_invalid_min_win_pct():
 
     with pytest.raises(ScoringValidationError, match="min_win_pct must be within"):
         utils.oowp(p0.id, rounds, min_win_pct=-0.1)
+
+
+# -------------------------------------------------------------------------
+# yugioh_tiebreak_number
+# -------------------------------------------------------------------------
+
+def test_yugioh_tiebreak_number_known_example():
+    # 33 pts, OWP 72.6%, OOWP 67.7% → 33726677
+    assert utils.yugioh_tiebreak_number(33, 0.726, 0.677) == 33_726_677
+
+
+def test_yugioh_tiebreak_number_with_loss_rounds():
+    # 18 pts, OWP 72.6%, OOWP 67.7%, lost round 7 → sum=49 → 18726677049
+    assert utils.yugioh_tiebreak_number(18, 0.726, 0.677, loss_rounds=[7]) == 18_726_677_049
+
+
+def test_yugioh_tiebreak_number_higher_beats_lower():
+    a = utils.yugioh_tiebreak_number(33, 0.726, 0.677)
+    b = utils.yugioh_tiebreak_number(33, 0.726, 0.640)
+    assert a > b
+
+
+def test_yugioh_tiebreak_number_loss_in_later_round_is_better():
+    early = utils.yugioh_tiebreak_number(6, 0.5, 0.5, loss_rounds=[1])
+    late = utils.yugioh_tiebreak_number(6, 0.5, 0.5, loss_rounds=[5])
+    assert late > early
+
+
+def test_yugioh_tiebreak_number_no_loss_rounds_is_8_digits():
+    result = utils.yugioh_tiebreak_number(33, 0.726, 0.677)
+    assert len(str(result)) == 8
+
+
+def test_yugioh_tiebreak_number_with_loss_rounds_is_11_digits():
+    result = utils.yugioh_tiebreak_number(33, 0.726, 0.677, loss_rounds=[3])
+    assert len(str(result)) == 11
+
+
+def test_yugioh_tiebreak_number_multiple_loss_rounds():
+    # Lost rounds 3 and 5: sum of squares = 9 + 25 = 34
+    result = utils.yugioh_tiebreak_number(6, 0.5, 0.5, loss_rounds=[3, 5])
+    loss_block = result % 1000
+    assert loss_block == 34
+
+
+def test_yugioh_tiebreak_number_empty_loss_rounds():
+    # Empty list means zero loss block → last 3 digits are 000
+    result = utils.yugioh_tiebreak_number(6, 0.5, 0.5, loss_rounds=[])
+    assert result % 1000 == 0
+
+
+def test_yugioh_tiebreak_number_rejects_negative_points():
+    with pytest.raises(ValueError, match="points must be non-negative"):
+        utils.yugioh_tiebreak_number(-1, 0.5, 0.5)
+
+
+def test_yugioh_tiebreak_number_rejects_owp_out_of_range():
+    with pytest.raises(ValueError, match="owp_val must be within"):
+        utils.yugioh_tiebreak_number(3, 1.1, 0.5)
+
+
+def test_yugioh_tiebreak_number_rejects_oowp_out_of_range():
+    with pytest.raises(ValueError, match="oowp_val must be within"):
+        utils.yugioh_tiebreak_number(3, 0.5, -0.1)
+
+
+def test_yugioh_tiebreak_number_rejects_non_positive_loss_round():
+    with pytest.raises(ValueError, match="loss round numbers must be positive"):
+        utils.yugioh_tiebreak_number(3, 0.5, 0.5, loss_rounds=[0])
