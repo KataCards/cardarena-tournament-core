@@ -183,12 +183,12 @@ class SingleElimination(BasePairing):
             Dictionary with keys:
             - participants: List of participant dicts (in seeding order)
             - rounds: List of round dicts
-            - active_participant_ids: List of active participant IDs
+            - active_participant_ids: Sorted list of active participant IDs
         """
         return {
             "participants": [participant_to_dict(p) for p in self._participants],
             "rounds": [r.to_dict() for r in self._rounds],
-            "active_participant_ids": list(self._active_ids),
+            "active_participant_ids": sorted(self._active_ids),
         }
 
     @classmethod

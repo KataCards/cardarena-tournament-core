@@ -317,7 +317,7 @@ class Swiss(BasePairing):
         return {
             "participants": [participant_to_dict(p) for p in self._participants],
             "rounds": [r.to_dict() for r in self._rounds],
-            "active_participant_ids": list(self._active_ids),
+            "active_participant_ids": sorted(self._active_ids),
             "config": {
                 "use_tiebreaker_sort": self._use_tiebreaker_sort,
                 "win_points": self._win_points,

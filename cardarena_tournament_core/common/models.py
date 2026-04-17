@@ -60,13 +60,12 @@ class Team:
     Args:
         id: Unique identifier for the team.
         name: Display name for the team.
-        members: Tuple of Player objects that make up the team.
-                Can also accept a list, which will be normalized to a tuple.
+         members: Tuple of Player objects that make up the team.
     
-    Example:
-        >>> player1 = Player(id="p1", name="Alice")
-        >>> player2 = Player(id="p2", name="Bob")
-        >>> team = Team(id="t1", name="Team Alpha", members=(player1, player2))
+     Example:
+         >>> player1 = Player(id="p1", name="Alice")
+         >>> player2 = Player(id="p2", name="Bob")
+         >>> team = Team(id="t1", name="Team Alpha", members=(player1, player2))
     """
 
     id: str
