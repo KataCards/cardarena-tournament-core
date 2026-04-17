@@ -59,7 +59,9 @@ class Swiss(BasePairing):
                 "tiebreaker_min_win_pct must be within [0.0, 1.0]."
             )
 
-        self._points: dict[str, int] = {participant.id: 0 for participant in participants}
+        self._points: dict[str, int] = {
+            participant.id: 0 for participant in self._participants
+        }
         self._played_pairs: set[frozenset[str]] = set()
         self._use_tiebreaker_sort = use_tiebreaker_sort
         self._win_points = win_points

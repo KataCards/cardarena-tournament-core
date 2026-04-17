@@ -216,8 +216,6 @@ cardarena_tournament_core/
 │   ├── __init__.py
 │   ├── errors.py           # Semantic exception hierarchy
 │   └── models.py           # Core data models
-├── errors.py               # Legacy compatibility re-export
-├── models.py               # Legacy compatibility re-export
 ├── tournament.py           # Tournament orchestrator
 ├── utils.py                # Win%, OWP, OOWP helpers
 ├── py.typed                # PEP 561 typed package marker
