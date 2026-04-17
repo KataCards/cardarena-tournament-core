@@ -19,7 +19,8 @@ class YuGiOh(TCGBaseScoring):
         3. OOWP — Opponents' Opponents' Win Percentage
 
     Unlike Pokémon TCG, Yu-Gi-Oh! does NOT apply a 25% floor to win percentages.
-    Standings are sorted by points (descending), then OWP (descending), then OOWP (descending) in integer form.
+    Standings are sorted by points (descending), then OWP (descending), then OOWP (descending). To get the tiebreaker-number like in KCGN use the util
+    yugioh_tiebreak_number function, which encodes the tiebreaker components into a single integer that preserves the sort order.
     """
 
     WIN_POINTS: ClassVar[int] = 3
