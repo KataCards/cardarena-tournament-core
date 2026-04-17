@@ -1,0 +1,80 @@
+name: Publish
+
+# Runs when develop is merged into main.
+# Reads the version that PSR already bumped in pyproject.toml, creates the
+# git tag, publishes a GitHub Release, and pushes the package to PyPI.
+#
+# PyPI publishing uses Trusted Publisher (OIDC) — no API token needed.
+# One-time setup: https://docs.pypi.org/trusted-publishers/adding-a-publisher/
+#   Publisher:  GitHub Actions
+#   Owner:      KataCards
+#   Repository: cardarena-tournament-core
+#   Workflow:   publish.yml
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Tag, Release & Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write   # create tags and GitHub releases
+      id-token: write   # PyPI Trusted Publisher (OIDC)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from pyproject.toml
+        id: ver
+        run: |
+          VERSION=$(python3 -c "
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              print(tomllib.load(f)['project']['version'])
+          ")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Abort if tag already exists
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/${{ steps.ver.outputs.tag }}$"; then
+            echo "::error::Tag ${{ steps.ver.outputs.tag }} already exists on origin. \
+          Was this version already released? Bump the version on develop first."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: uv build
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" dist/* \
+            --title "${{ steps.ver.outputs.tag }}" \
+            --generate-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

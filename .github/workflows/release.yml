@@ -1,0 +1,52 @@
+name: Version Bump
+
+# Runs on every push to develop.
+# python-semantic-release reads conventional commits since the last tag,
+# bumps the version in pyproject.toml, commits, and pushes — no tag created here.
+# The actual tag + PyPI release happens in publish.yml when develop is merged into main.
+
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump version (no tag)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PSR_APP_ID }}
+          private-key: ${{ secrets.PSR_APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install python-semantic-release
+        run: pip install python-semantic-release
+
+      - name: Bump version in pyproject.toml
+        # --no-tag: commit and push the version bump but do not create a git tag.
+        # If no release-worthy commits exist (e.g. only chore:/docs:) PSR exits
+        # cleanly with no changes.
+        run: semantic-release version --no-tag
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
