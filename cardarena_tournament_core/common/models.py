@@ -42,14 +42,34 @@ class Player:
         if not self.name:
             raise ParticipantValidationError("Player name cannot be empty.")
 
+    def to_dict(self) -> dict:
+        """Serialize player to dictionary."""
+        return {"type": "player", "id": self.id, "name": self.name}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Player":
+        """Deserialize player from dictionary."""
+        return cls(id=data["id"], name=data["name"])
+
 
 @dataclass(frozen=True)
 class Team:
-    """A team of players that competes as a single tournament participant."""
+    """A team of players that competes as a single tournament participant.
+    
+    Args:
+        id: Unique identifier for the team.
+        name: Display name for the team.
+        members: List of Player objects that make up the team.
+    
+    Example:
+        >>> player1 = Player(id="p1", name="Alice")
+        >>> player2 = Player(id="p2", name="Bob")
+        >>> team = Team(id="t1", name="Team Alpha", members=[player1, player2])
+    """
 
     id: str
     name: str
-    members: tuple[str, ...]
+    members: tuple["Player", ...]
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -59,9 +79,50 @@ class Team:
         if not self.members:
             raise TeamValidationError("Team must have at least one member.")
 
+    def to_dict(self) -> dict:
+        """Serialize team to dictionary."""
+        return {
+            "type": "team",
+            "id": self.id,
+            "name": self.name,
+            "members": [member.to_dict() for member in self.members]
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Team":
+        """Deserialize team from dictionary."""
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            members=tuple(Player.from_dict(m) for m in data["members"])
+        )
+
 
 # Either an individual player or a team can participate in a tournament.
 Participant = Player | Team
+
+
+# -------------------------------------------------------------------------
+# Participant serialization helpers
+# -------------------------------------------------------------------------
+
+def participant_to_dict(participant: Participant) -> dict:
+    """Serialize a Participant (Player or Team) to dictionary."""
+    return participant.to_dict()
+
+
+def participant_from_dict(data: dict) -> Participant:
+    """Deserialize a Participant from dictionary.
+
+    Raises:
+        ParticipantValidationError: Unknown participant type.
+    """
+    if data["type"] == "player":
+        return Player.from_dict(data)
+    elif data["type"] == "team":
+        return Team.from_dict(data)
+    else:
+        raise ParticipantValidationError(f"Unknown participant type: {data['type']}")
 
 
 # -------------------------------------------------------------------------
@@ -96,6 +157,23 @@ class Matchup:
         """``True`` when the matchup no longer requires manual input."""
         return self.is_bye or self.outcome != MatchupOutcome.PENDING
 
+    def to_dict(self) -> dict:
+        """Serialize matchup to dictionary."""
+        return {
+            "player1": participant_to_dict(self.player1),
+            "player2": participant_to_dict(self.player2) if self.player2 else None,
+            "outcome": self.outcome.value
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Matchup":
+        """Deserialize matchup from dictionary."""
+        return cls(
+            player1=participant_from_dict(data["player1"]),
+            player2=participant_from_dict(data["player2"]) if data["player2"] else None,
+            outcome=MatchupOutcome(data["outcome"])
+        )
+
 
 @dataclass
 class Round:
@@ -121,6 +199,21 @@ class Round:
             if matchup.player2 is not None and matchup.player2.id == player_id:
                 return matchup
         return None
+
+    def to_dict(self) -> dict:
+        """Serialize round to dictionary."""
+        return {
+            "round_number": self.round_number,
+            "matchups": [m.to_dict() for m in self.matchups]
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Round":
+        """Deserialize round from dictionary."""
+        return cls(
+            round_number=data["round_number"],
+            matchups=[Matchup.from_dict(m) for m in data["matchups"]]
+        )
 
 
 @dataclass
@@ -152,4 +245,6 @@ __all__ = [
     "MatchupOutcome",
     "Round",
     "Standing",
+    "participant_to_dict",
+    "participant_from_dict",
 ]

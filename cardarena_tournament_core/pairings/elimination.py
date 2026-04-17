@@ -1,7 +1,14 @@
 from collections.abc import Sequence
 
 from cardarena_tournament_core.common.errors import PairingStateError, TournamentCompleteError
-from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Participant, Round
+from cardarena_tournament_core.common.models import (
+    Matchup,
+    MatchupOutcome,
+    Participant,
+    Round,
+    participant_from_dict,
+    participant_to_dict,
+)
 from cardarena_tournament_core.pairings.base import BasePairing
 
 
@@ -93,3 +100,112 @@ class SingleElimination(BasePairing):
 
         super().submit_results(completed_round)
         self._active_ids = set(winner_ids)
+
+    # -------------------------------------------------------------------------
+    # Serialization and reconstruction
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def from_history(
+        cls,
+        participants: Sequence[Participant],
+        rounds: Sequence[Round],
+        active_participant_ids: set[str],
+    ) -> "SingleElimination":
+        """Reconstruct a Single Elimination tournament from its round history.
+
+        Enables stateless operation by rebuilding the active participant set
+        from the complete round history. Winners from each round automatically
+        advance, but active_participant_ids is always provided to handle manual
+        removals between rounds.
+
+        Args:
+            participants: All tournament participants in seeding order.
+            rounds: Complete round history in chronological order. Each round
+                   must have all outcomes recorded (is_complete == True).
+            active_participant_ids: Set of participant IDs currently eligible
+                                   for pairing. Always provided by design.
+
+        Returns:
+            SingleElimination instance with state matching the provided history.
+
+        Raises:
+            PairingConfigurationError: Invalid configuration parameters.
+            PairingStateError: Round history is invalid (incomplete rounds,
+                              unknown participants, out-of-order rounds, or
+                              active_participant_ids contains unknown IDs).
+
+        Example:
+            >>> elimination = SingleElimination.from_history(
+            ...     participants=[participant_from_dict(p) for p in data["participants"]],
+            ...     rounds=[Round.from_dict(r) for r in data["rounds"]],
+            ...     active_participant_ids=set(data["active_participant_ids"]),
+            ... )
+            >>> next_round = elimination.pair()
+        """
+        # Create fresh instance with initial state
+        instance = cls(participants=participants)
+
+        # Replay all rounds to rebuild active set from winners
+        for round_obj in rounds:
+            # STRICT VALIDATION: Fail fast on incomplete rounds
+            if not round_obj.is_complete:
+                raise PairingStateError(
+                    f"Cannot reconstruct from incomplete round {round_obj.round_number}. "
+                    f"All rounds must have recorded outcomes."
+                )
+
+            # submit_results will:
+            # 1. Validate round integrity (sequential numbering, valid participants)
+            # 2. Determine winners from matchup outcomes
+            # 3. Update _active_ids to only include winners
+            # 4. Append to _rounds history
+            instance.submit_results(round_obj)
+
+        # STRICT VALIDATION: Verify all active IDs are registered participants
+        unknown_ids = active_participant_ids - instance._participant_ids
+        if unknown_ids:
+            raise PairingStateError(
+                f"active_participant_ids contains unregistered participants: "
+                f"{', '.join(sorted(unknown_ids))}"
+            )
+
+        # Override with provided active set (handles manual removals between rounds)
+        instance._active_ids = set(active_participant_ids)
+
+        return instance
+
+    def to_dict(self) -> dict:
+        """Export tournament state for persistence.
+
+        Returns:
+            Dictionary with keys:
+            - participants: List of participant dicts (in seeding order)
+            - rounds: List of round dicts
+            - active_participant_ids: List of active participant IDs
+        """
+        return {
+            "participants": [participant_to_dict(p) for p in self._participants],
+            "rounds": [r.to_dict() for r in self._rounds],
+            "active_participant_ids": list(self._active_ids),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SingleElimination":
+        """Reconstruct tournament from serialized state.
+
+        Args:
+            data: Dictionary from to_dict() or database.
+
+        Returns:
+            Reconstructed SingleElimination instance.
+        """
+        participants = [participant_from_dict(p) for p in data["participants"]]
+        rounds = [Round.from_dict(r) for r in data["rounds"]]
+        active_ids = set(data["active_participant_ids"])
+
+        return cls.from_history(
+            participants=participants,
+            rounds=rounds,
+            active_participant_ids=active_ids,
+        )

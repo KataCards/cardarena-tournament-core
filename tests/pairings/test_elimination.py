@@ -180,3 +180,197 @@ def test_already_paired_round_submittable_after_removal_in_elimination():
         m.outcome = MatchupOutcome.PLAYER1_WINS
     elim.submit_results(r1)    # must not raise
     assert len(elim.rounds) == 1
+
+
+# -------------------------------------------------------------------------
+# Reconstruction tests
+# -------------------------------------------------------------------------
+
+def test_from_history_matches_sequential_state():
+    """CRITICAL: Verify from_history produces identical state to sequential processing."""
+    players = make_players(8)
+    
+    # Path 1: Sequential processing
+    elim1 = SingleElimination(players)
+    round1 = elim1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim1.submit_results(round1)
+    
+    # Path 2: Reconstruction from history
+    elim2 = SingleElimination.from_history(
+        participants=players,
+        rounds=[round1],
+        active_participant_ids=set(elim1.active_participant_ids)
+    )
+    
+    # Verify IDENTICAL internal state
+    assert elim1._active_ids == elim2._active_ids, "Active IDs must match exactly"
+    assert elim1._seeding_order == elim2._seeding_order, "Seeding order must match"
+    assert len(elim1._rounds) == len(elim2._rounds), "Round count must match"
+    
+    # Verify next pairing is IDENTICAL
+    next1 = elim1.pair()
+    next2 = elim2.pair()
+    
+    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
+    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
+    assert pairs1 == pairs2, "Next round pairings must be identical"
+
+
+def test_from_history_rejects_incomplete_rounds():
+    """STRICT VALIDATION: Incomplete rounds must cause immediate failure."""
+    players = make_players(8)
+    elim = SingleElimination(players)
+    round1 = elim.pair()
+    # Don't set outcomes - leave incomplete
+    
+    with pytest.raises(PairingStateError, match="incomplete round"):
+        SingleElimination.from_history(
+            participants=players,
+            rounds=[round1],
+            active_participant_ids={p.id for p in players}
+        )
+
+
+def test_from_history_rejects_unknown_active_participants():
+    """STRICT VALIDATION: Unknown active IDs must cause immediate failure."""
+    players = make_players(8)
+    
+    with pytest.raises(PairingStateError, match="unregistered participants"):
+        SingleElimination.from_history(
+            participants=players,
+            rounds=[],
+            active_participant_ids={"999"}  # Unknown ID
+        )
+
+
+def test_to_dict_from_dict_roundtrip():
+    """Verify to_dict/from_dict preserves complete state."""
+    players = make_players(8)
+    elim1 = SingleElimination(players)
+    
+    round1 = elim1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim1.submit_results(round1)
+    
+    # Serialize and deserialize
+    data = elim1.to_dict()
+    elim2 = SingleElimination.from_dict(data)
+    
+    # Verify identical state
+    assert elim1._active_ids == elim2._active_ids
+    assert elim1._seeding_order == elim2._seeding_order
+    assert len(elim1._rounds) == len(elim2._rounds)
+
+
+def test_from_history_with_active_override():
+    """Verify active_participant_ids override works (manual removal case)."""
+    players = make_players(8)
+    
+    elim1 = SingleElimination(players)
+    round1 = elim1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim1.submit_results(round1)
+    
+    # Manually remove a winner (edge case)
+    elim1.remove_active_participant("0")
+    
+    # Reconstruct with override
+    elim2 = SingleElimination.from_history(
+        participants=players,
+        rounds=[round1],
+        active_participant_ids=set(elim1.active_participant_ids)
+    )
+    
+    assert elim2.active_participant_ids == elim1.active_participant_ids
+    assert "0" not in elim2.active_participant_ids
+
+
+def test_from_history_multiple_rounds():
+    """Verify reconstruction handles multiple rounds correctly."""
+    players = make_players(8)
+    
+    elim1 = SingleElimination(players)
+    
+    # Round 1
+    round1 = elim1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim1.submit_results(round1)
+    
+    # Round 2
+    round2 = elim1.pair()
+    for m in round2.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim1.submit_results(round2)
+    
+    # Reconstruct
+    elim2 = SingleElimination.from_history(
+        participants=players,
+        rounds=[round1, round2],
+        active_participant_ids=set(elim1.active_participant_ids)
+    )
+    
+    # Verify state matches
+    assert elim1._active_ids == elim2._active_ids
+    assert len(elim1._rounds) == len(elim2._rounds)
+    
+    # Verify next round is identical
+    next1 = elim1.pair()
+    next2 = elim2.pair()
+    
+    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
+    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
+    assert pairs1 == pairs2
+
+
+def test_from_history_empty_rounds_list():
+    """Verify reconstruction with no rounds creates fresh state."""
+    players = make_players(8)
+    elim = SingleElimination.from_history(
+        participants=players,
+        rounds=[],
+        active_participant_ids={p.id for p in players}
+    )
+    
+    assert len(elim._rounds) == 0
+    assert elim.active_participant_ids == {p.id for p in players}
+    assert elim._seeding_order == [str(i) for i in range(8)]
+
+
+def test_from_history_with_byes():
+    """Verify reconstruction handles rounds with byes correctly."""
+    players = make_players(7)  # Odd number for bye
+    
+    elim1 = SingleElimination(players)
+    round1 = elim1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    elim1.submit_results(round1)
+    
+    # Reconstruct
+    elim2 = SingleElimination.from_history(
+        participants=players,
+        rounds=[round1],
+        active_participant_ids=set(elim1.active_participant_ids)
+    )
+    
+    # Verify state matches
+    assert elim1._active_ids == elim2._active_ids
+    
+    # Verify next round is identical
+    next1 = elim1.pair()
+    next2 = elim2.pair()
+    
+    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
+    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
+    assert pairs1 == pairs2

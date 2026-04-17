@@ -331,3 +331,218 @@ def test_pair_raises_when_no_active_participants_remain():
 
     with pytest.raises(TournamentCompleteError, match="No active participants remain"):
         swiss.pair()
+
+
+# -------------------------------------------------------------------------
+# Reconstruction tests
+# -------------------------------------------------------------------------
+
+def test_from_history_matches_sequential_state():
+    """CRITICAL: Verify from_history produces identical state to sequential processing."""
+    players = make_players(8)
+    
+    # Path 1: Sequential processing
+    swiss1 = Swiss(players, use_tiebreaker_sort=True)
+    round1 = swiss1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss1.submit_results(round1)
+    
+    round2 = swiss1.pair()
+    for m in round2.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.DRAW
+    swiss1.submit_results(round2)
+    
+    # Path 2: Reconstruction from history
+    swiss2 = Swiss.from_history(
+        participants=players,
+        rounds=[round1, round2],
+        active_participant_ids=set(swiss1.active_participant_ids),
+        use_tiebreaker_sort=True
+    )
+    
+    # Verify IDENTICAL internal state
+    assert swiss1._points == swiss2._points, "Points must match exactly"
+    assert swiss1._played_pairs == swiss2._played_pairs, "Played pairs must match exactly"
+    assert swiss1._active_ids == swiss2._active_ids, "Active IDs must match exactly"
+    assert len(swiss1._rounds) == len(swiss2._rounds), "Round count must match"
+    
+    # Verify next pairing is IDENTICAL
+    next1 = swiss1.pair()
+    next2 = swiss2.pair()
+    
+    # Compare matchup pairs (order might differ but pairs should be same)
+    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
+    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
+    assert pairs1 == pairs2, "Next round pairings must be identical"
+
+
+def test_from_history_with_active_participant_override():
+    """Verify active_participant_ids override works correctly."""
+    players = make_players(8)
+    
+    swiss1 = Swiss(players)
+    round1 = swiss1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss1.submit_results(round1)
+    swiss1.remove_active_participant("3")
+    
+    # Reconstruct with same active set
+    swiss2 = Swiss.from_history(
+        participants=players,
+        rounds=[round1],
+        active_participant_ids=set(swiss1.active_participant_ids)
+    )
+    
+    assert swiss2.active_participant_ids == swiss1.active_participant_ids
+    assert "3" not in swiss2.active_participant_ids
+    
+    # Next pairing should exclude player "3" in both
+    next1 = swiss1.pair()
+    next2 = swiss2.pair()
+    
+    for matchup in next1.matchups + next2.matchups:
+        assert matchup.player1.id != "3"
+        assert matchup.player2 is None or matchup.player2.id != "3"
+
+
+def test_to_dict_from_dict_roundtrip():
+    """Verify to_dict/from_dict preserves complete state."""
+    players = make_players(6)
+    swiss1 = Swiss(players, use_tiebreaker_sort=True, win_points=5)
+    
+    round1 = swiss1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss1.submit_results(round1)
+    swiss1.remove_active_participant("5")
+    
+    # Serialize and deserialize
+    data = swiss1.to_dict()
+    swiss2 = Swiss.from_dict(data)
+    
+    # Verify identical state
+    assert swiss1._points == swiss2._points
+    assert swiss1._played_pairs == swiss2._played_pairs
+    assert swiss1._active_ids == swiss2._active_ids
+    assert swiss1._use_tiebreaker_sort == swiss2._use_tiebreaker_sort
+    assert swiss1._win_points == swiss2._win_points
+    assert len(swiss1._rounds) == len(swiss2._rounds)
+
+
+def test_from_history_rejects_incomplete_rounds():
+    """STRICT VALIDATION: Incomplete rounds must cause immediate failure."""
+    players = make_players(4)
+    swiss = Swiss(players)
+    round1 = swiss.pair()
+    # Don't set outcomes - leave incomplete
+    
+    with pytest.raises(PairingStateError, match="incomplete round"):
+        Swiss.from_history(
+            participants=players,
+            rounds=[round1],
+            active_participant_ids={p.id for p in players}
+        )
+
+
+def test_from_history_rejects_unknown_active_participants():
+    """STRICT VALIDATION: Unknown active IDs must cause immediate failure."""
+    players = make_players(4)
+    
+    with pytest.raises(PairingStateError, match="unregistered participants"):
+        Swiss.from_history(
+            participants=players,
+            rounds=[],
+            active_participant_ids={"999"}  # Unknown ID
+        )
+
+
+def test_from_history_rejects_partial_active_ids():
+    """STRICT VALIDATION: Active IDs must be subset of participants."""
+    players = make_players(4)
+    
+    with pytest.raises(PairingStateError, match="unregistered participants"):
+        Swiss.from_history(
+            participants=players,
+            rounds=[],
+            active_participant_ids={"0", "1", "999"}  # Mix of valid and invalid
+        )
+
+
+def test_from_history_empty_rounds_list():
+    """Verify reconstruction with no rounds creates fresh state."""
+    players = make_players(4)
+    swiss = Swiss.from_history(
+        participants=players,
+        rounds=[],
+        active_participant_ids={p.id for p in players}
+    )
+    
+    assert all(points == 0 for points in swiss._points.values())
+    assert len(swiss._played_pairs) == 0
+    assert len(swiss._rounds) == 0
+    assert swiss.active_participant_ids == {p.id for p in players}
+
+
+def test_from_history_with_custom_config():
+    """Verify from_history respects custom configuration parameters."""
+    players = make_players(4)
+    
+    swiss = Swiss.from_history(
+        participants=players,
+        rounds=[],
+        active_participant_ids={p.id for p in players},
+        use_tiebreaker_sort=True,
+        win_points=5,
+        draw_points=2,
+        bye_points=4,
+        tiebreaker_min_win_pct=0.33
+    )
+    
+    assert swiss._use_tiebreaker_sort is True
+    assert swiss._win_points == 5
+    assert swiss._draw_points == 2
+    assert swiss._bye_points == 4
+    assert swiss._tiebreaker_min_win_pct == 0.33
+
+
+def test_from_history_multiple_rounds_with_byes():
+    """Verify reconstruction handles multiple rounds including byes correctly."""
+    players = make_players(5)  # Odd number for byes
+    
+    swiss1 = Swiss(players)
+    round1 = swiss1.pair()
+    for m in round1.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.PLAYER1_WINS
+    swiss1.submit_results(round1)
+    
+    round2 = swiss1.pair()
+    for m in round2.matchups:
+        if m.player2:
+            m.outcome = MatchupOutcome.DRAW
+    swiss1.submit_results(round2)
+    
+    # Reconstruct
+    swiss2 = Swiss.from_history(
+        participants=players,
+        rounds=[round1, round2],
+        active_participant_ids=set(swiss1.active_participant_ids)
+    )
+    
+    # Verify state matches
+    assert swiss1._points == swiss2._points
+    assert swiss1._played_pairs == swiss2._played_pairs
+    
+    # Verify next round is identical
+    next1 = swiss1.pair()
+    next2 = swiss2.pair()
+    
+    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
+    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
+    assert pairs1 == pairs2
