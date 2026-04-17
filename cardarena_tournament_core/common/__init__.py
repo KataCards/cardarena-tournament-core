@@ -26,6 +26,8 @@ from cardarena_tournament_core.common.models import (
     Round,
     Standing,
     Team,
+    participant_from_dict,
+    participant_to_dict,
 )
 
 __all__ = [
@@ -52,4 +54,6 @@ __all__ = [
     "MatchupOutcome",
     "Round",
     "Standing",
+    "participant_to_dict",
+    "participant_from_dict",
 ]

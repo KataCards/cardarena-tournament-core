@@ -1,11 +1,19 @@
 from collections.abc import Sequence
+from typing import Any
 
 from cardarena_tournament_core.common.errors import (
     PairingConfigurationError,
     PairingStateError,
     TournamentCompleteError,
 )
-from cardarena_tournament_core.common.models import Matchup, MatchupOutcome, Participant, Round
+from cardarena_tournament_core.common.models import (
+    Matchup,
+    MatchupOutcome,
+    Participant,
+    Round,
+    participant_from_dict,
+    participant_to_dict,
+)
 from cardarena_tournament_core.pairings.base import BasePairing
 from cardarena_tournament_core import utils
 
@@ -191,4 +199,160 @@ class Swiss(BasePairing):
                 )
             ),
             None,
+        )
+
+    # -------------------------------------------------------------------------
+    # Serialization and reconstruction
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def from_history(
+        cls,
+        participants: Sequence[Participant],
+        rounds: Sequence[Round],
+        active_participant_ids: set[str],
+        use_tiebreaker_sort: bool = False,
+        win_points: int = DEFAULT_WIN_POINTS,
+        draw_points: int = DEFAULT_DRAW_POINTS,
+        bye_points: int = DEFAULT_BYE_POINTS,
+        tiebreaker_min_win_pct: float = 0.25,
+    ) -> "Swiss":
+        """Reconstruct a Swiss tournament from its round history.
+
+        Enables stateless operation by rebuilding all internal state (_points,
+        _played_pairs, etc.) from the complete round history. The reconstructed
+        instance will have identical state to one that processed the same rounds
+        sequentially.
+
+        Args:
+            participants: All tournament participants (must include all players
+                         that appear in any round).
+            rounds: Complete round history in chronological order. Each round
+                   must have all outcomes recorded (is_complete == True).
+            active_participant_ids: Set of participant IDs currently eligible
+                                   for pairing. Always provided by design.
+            use_tiebreaker_sort: Enable OWP/OOWP tiebreaker sorting.
+            win_points: Points awarded for a win.
+            draw_points: Points awarded for a draw.
+            bye_points: Points awarded for a bye.
+            tiebreaker_min_win_pct: Minimum win percentage floor for tiebreakers.
+
+        Returns:
+            Swiss instance with state matching the provided history.
+
+        Raises:
+            PairingConfigurationError: Invalid configuration parameters.
+            PairingStateError: Round history is invalid (incomplete rounds,
+                              unknown participants, out-of-order rounds, or
+                              active_participant_ids contains unknown IDs).
+
+        Example:
+            >>> # Reconstruct from external storage
+            >>> swiss = Swiss.from_history(
+            ...     participants=[participant_from_dict(p) for p in data["participants"]],
+            ...     rounds=[Round.from_dict(r) for r in data["rounds"]],
+            ...     active_participant_ids=set(data["active_participant_ids"]),
+            ...     **data["config"]
+            ... )
+            >>> next_round = swiss.pair()
+        """
+        # Create fresh instance with initial state
+        instance = cls(
+            participants=participants,
+            use_tiebreaker_sort=use_tiebreaker_sort,
+            win_points=win_points,
+            draw_points=draw_points,
+            bye_points=bye_points,
+            tiebreaker_min_win_pct=tiebreaker_min_win_pct,
+        )
+
+        # STRICT VALIDATION: Verify all active IDs are registered participants
+        unknown_ids = active_participant_ids - instance._participant_ids
+        if unknown_ids:
+            raise PairingStateError(
+                f"active_participant_ids contains unregistered participants: "
+                f"{', '.join(sorted(unknown_ids))}"
+            )
+
+        # Set active participants (always provided by design)
+        instance._active_ids = set(active_participant_ids)
+
+        # Replay all rounds to rebuild derived state (_points, _played_pairs)
+        for round_obj in rounds:
+            # STRICT VALIDATION: Fail fast on incomplete rounds
+            if not round_obj.is_complete:
+                raise PairingStateError(
+                    f"Cannot reconstruct from incomplete round {round_obj.round_number}. "
+                    f"All rounds must have recorded outcomes."
+                )
+
+            # submit_results will:
+            # 1. Validate round integrity (sequential numbering, valid participants)
+            # 2. Update _points based on outcomes
+            # 3. Update _played_pairs with new matchups
+            # 4. Append to _rounds history
+            instance.submit_results(round_obj)
+
+        return instance
+
+    def to_dict(self) -> dict[str, Any]:
+        """Export tournament state for persistence.
+
+        Returns a dictionary containing all data needed to reconstruct this
+        tournament via from_history() or to serialize to a database.
+
+        Returns:
+            Dictionary with keys:
+            - participants: List of participant dicts
+            - rounds: List of round dicts
+            - active_participant_ids: List of active participant IDs
+            - config: Configuration parameters
+
+        Example:
+            >>> swiss = Swiss(players, use_tiebreaker_sort=True)
+            >>> # ... run tournament ...
+            >>> state = swiss.to_dict()
+            >>> # Save to external storage
+        """
+        return {
+            "participants": [participant_to_dict(p) for p in self._participants],
+            "rounds": [r.to_dict() for r in self._rounds],
+            "active_participant_ids": sorted(self._active_ids),
+            "config": {
+                "use_tiebreaker_sort": self._use_tiebreaker_sort,
+                "win_points": self._win_points,
+                "draw_points": self._draw_points,
+                "bye_points": self._bye_points,
+                "tiebreaker_min_win_pct": self._tiebreaker_min_win_pct,
+            }
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Swiss":
+        """Reconstruct tournament from serialized state.
+
+        Convenience wrapper around from_history() that accepts the dictionary
+        format produced by to_dict().
+
+        Args:
+            data: Dictionary from to_dict() or database.
+
+        Returns:
+            Reconstructed Swiss instance.
+
+        Example:
+            >>> state = load_from_storage(tournament_id)
+            >>> swiss = Swiss.from_dict(state)
+            >>> next_round = swiss.pair()
+        """
+        participants = [participant_from_dict(p) for p in data["participants"]]
+        rounds = [Round.from_dict(r) for r in data["rounds"]]
+        active_ids = set(data["active_participant_ids"])
+        config = data["config"]
+
+        return cls.from_history(
+            participants=participants,
+            rounds=rounds,
+            active_participant_ids=active_ids,
+            **config
         )
