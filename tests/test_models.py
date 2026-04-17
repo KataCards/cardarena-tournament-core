@@ -263,6 +263,92 @@ def test_team_empty_members_raises_validation_error():
         Team(id="t1", name="Team A", members=())
 
 
+def test_team_normalizes_list_to_tuple():
+    """Verify Team converts list members to tuple for hashability."""
+    p1 = Player(id="p1", name="Alice")
+    p2 = Player(id="p2", name="Bob")
+    
+    # Pass a list instead of tuple
+    team = Team(id="t1", name="Team A", members=[p1, p2])  # type: ignore[arg-type]
+    
+    # Should be normalized to tuple
+    assert isinstance(team.members, tuple)
+    assert len(team.members) == 2
+    assert team.members[0] == p1
+    assert team.members[1] == p2
+
+
+def test_team_is_hashable_with_tuple_members():
+    """Verify Team is hashable when members is a tuple."""
+    p1 = Player(id="p1", name="Alice")
+    p2 = Player(id="p2", name="Bob")
+    
+    team = Team(id="t1", name="Team A", members=(p1, p2))
+    
+    # Should be hashable (frozen dataclass with tuple members)
+    team_hash = hash(team)
+    assert isinstance(team_hash, int)
+    
+    # Can be used in sets
+    team_set = {team}
+    assert team in team_set
+
+
+def test_team_is_hashable_after_list_normalization():
+    """Verify Team is hashable even when initialized with a list."""
+    p1 = Player(id="p1", name="Alice")
+    p2 = Player(id="p2", name="Bob")
+    
+    # Initialize with list
+    team = Team(id="t1", name="Team A", members=[p1, p2])  # type: ignore[arg-type]
+    
+    # Should still be hashable after normalization
+    team_hash = hash(team)
+    assert isinstance(team_hash, int)
+
+
+def test_team_rejects_non_player_members():
+    """Verify Team raises error when members contain non-Player objects."""
+    from cardarena_tournament_core.common.errors import TeamValidationError
+    
+    p1 = Player(id="p1", name="Alice")
+    
+    with pytest.raises(TeamValidationError, match="must be a Player instance"):
+        Team(id="t1", name="Team A", members=(p1, "not a player"))  # type: ignore[arg-type]
+
+
+def test_team_rejects_mixed_valid_invalid_members():
+    """Verify Team raises error with specific index when non-Player found."""
+    from cardarena_tournament_core.common.errors import TeamValidationError
+    
+    p1 = Player(id="p1", name="Alice")
+    p2 = Player(id="p2", name="Bob")
+    
+    with pytest.raises(TeamValidationError, match="at index 2 must be a Player instance"):
+        Team(id="t1", name="Team A", members=(p1, p2, {"id": "p3", "name": "Charlie"}))  # type: ignore[arg-type]
+
+
+def test_team_serialization_roundtrip_preserves_tuple():
+    """Verify Team serialization/deserialization maintains tuple type."""
+    p1 = Player(id="p1", name="Alice")
+    p2 = Player(id="p2", name="Bob")
+    
+    # Create with list
+    team = Team(id="t1", name="Team A", members=[p1, p2])  # type: ignore[arg-type]
+    
+    # Serialize
+    data = team.to_dict()
+    
+    # Deserialize
+    restored = Team.from_dict(data)
+    
+    # Should be tuple
+    assert isinstance(restored.members, tuple)
+    assert len(restored.members) == 2
+    assert restored.members[0].id == "p1"
+    assert restored.members[1].id == "p2"
+
+
 def test_matchup_same_participant_raises_validation_error():
     """Verify Matchup raises error when participant plays themselves."""
     from cardarena_tournament_core.common.errors import MatchupValidationError

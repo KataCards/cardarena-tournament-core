@@ -60,12 +60,13 @@ class Team:
     Args:
         id: Unique identifier for the team.
         name: Display name for the team.
-        members: List of Player objects that make up the team.
+        members: Tuple of Player objects that make up the team.
+                Can also accept a list, which will be normalized to a tuple.
     
     Example:
         >>> player1 = Player(id="p1", name="Alice")
         >>> player2 = Player(id="p2", name="Bob")
-        >>> team = Team(id="t1", name="Team Alpha", members=[player1, player2])
+        >>> team = Team(id="t1", name="Team Alpha", members=(player1, player2))
     """
 
     id: str
@@ -79,6 +80,18 @@ class Team:
             raise TeamValidationError("Team name cannot be empty.")
         if not self.members:
             raise TeamValidationError("Team must have at least one member.")
+        
+        # Normalize members to tuple if a list was passed
+        if not isinstance(self.members, tuple):
+            object.__setattr__(self, "members", tuple(self.members))
+        
+        # Validate all members are Player instances
+        for i, member in enumerate(self.members):
+            if not isinstance(member, Player):
+                raise TeamValidationError(
+                    f"Team member at index {i} must be a Player instance, "
+                    f"got {type(member).__name__}"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize team to dictionary."""
