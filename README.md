@@ -162,17 +162,292 @@ for standing in standings:
 
 ### Teams
 
-`Team` is a first-class participant alongside `Player`. Pass teams anywhere a player is expected:
+`Team` is a first-class participant alongside `Player`. Teams are composed of `Player` objects and can be used anywhere a player is expected:
 
 ```python
-from cardarena_tournament_core import Team, Swiss
+from cardarena_tournament_core import Player, Team, Swiss
 
+# Create individual players
+alice = Player(id="p1", name="Alice")
+bob = Player(id="p2", name="Bob")
+carol = Player(id="p3", name="Carol")
+dave = Player(id="p4", name="Dave")
+
+# Create teams with Player objects as members
 teams = [
-    Team(id="t1", name="Mystic Dragons", members=("Alice", "Bob")),
-    Team(id="t2", name="Storm Hawks",    members=("Carol", "Dave")),
+    Team(id="t1", name="Mystic Dragons", members=(alice, bob)),
+    Team(id="t2", name="Storm Hawks", members=(carol, dave)),
 ]
+
+# Use teams in any pairing format
 swiss = Swiss(teams)
+
+# Access team member information
+for team in teams:
+    print(f"{team.name}: {', '.join(m.name for m in team.members)}")
+    # Output: Mystic Dragons: Alice, Bob
+    #         Storm Hawks: Carol, Dave
 ```
+
+**Serialization:** Teams serialize to JSON-friendly dictionaries with nested player data:
+
+```python
+team_dict = teams[0].to_dict()
+# {
+#     "type": "team",
+#     "id": "t1",
+#     "name": "Mystic Dragons",
+#     "members": [
+#         {"type": "player", "id": "p1", "name": "Alice"},
+#         {"type": "player", "id": "p2", "name": "Bob"}
+#     ]
+# }
+
+# Reconstruct from dictionary
+restored_team = Team.from_dict(team_dict)
+```
+
+---
+
+## Stateless Tournament Reconstruction
+
+**Swiss** and **Single Elimination** formats support stateless reconstruction from round history. This enables you to:
+
+- **Persist tournaments** to any database (SQL, NoSQL, file storage)
+- **Reconstruct state** deterministically from historical data
+- **Resume tournaments** across server restarts or different processes
+- **Migrate tournaments** between systems
+
+### Core Concepts
+
+Tournament state is **derived** from:
+1. **Participant list** — all registered players/teams
+2. **Round history** — completed rounds with outcomes
+3. **Active participant IDs** — participants still eligible for pairing
+4. **Configuration** — format-specific settings (points, tiebreakers, etc.)
+
+### Swiss Reconstruction
+
+```python
+from cardarena_tournament_core import Player, Swiss, MatchupOutcome
+
+# Original tournament
+players = [Player(id=str(i), name=f"Player {i}") for i in range(8)]
+swiss = Swiss(players)
+
+# Play round 1
+round1 = swiss.pair()
+round1.matchups[0].outcome = MatchupOutcome.PLAYER1_WINS
+round1.matchups[1].outcome = MatchupOutcome.DRAW
+round1.matchups[2].outcome = MatchupOutcome.PLAYER2_WINS
+round1.matchups[3].outcome = MatchupOutcome.PLAYER1_WINS
+swiss.submit_results(round1)
+
+# Play round 2
+round2 = swiss.pair()
+for matchup in round2.matchups:
+    if matchup.player2:
+        matchup.outcome = MatchupOutcome.PLAYER1_WINS
+swiss.submit_results(round2)
+
+# Serialize complete state
+tournament_state = swiss.to_dict()
+# Save to database: db.tournaments.insert_one(tournament_state)
+
+# Later: Reconstruct from database
+# tournament_data = db.tournaments.find_one({"_id": tournament_id})
+reconstructed = Swiss.from_dict(tournament_state)
+
+# State is identical — continue tournament
+round3 = reconstructed.pair()
+```
+
+### Single Elimination Reconstruction
+
+```python
+from cardarena_tournament_core import Player, SingleElimination, MatchupOutcome
+
+# Original tournament
+players = [Player(id=str(i), name=f"Seed {i+1}") for i in range(8)]
+elim = SingleElimination(players)
+
+# Play quarterfinals
+round1 = elim.pair()
+for matchup in round1.matchups:
+    if matchup.player2:
+        matchup.outcome = MatchupOutcome.PLAYER1_WINS
+elim.submit_results(round1)
+
+# Serialize and save
+state = elim.to_dict()
+
+# Reconstruct
+reconstructed = SingleElimination.from_dict(state)
+
+# Continue with semifinals
+round2 = reconstructed.pair()
+```
+
+### Serialization Format
+
+**Swiss:**
+```python
+{
+    "participants": [
+        {"type": "player", "id": "0", "name": "Player 0"},
+        {"type": "player", "id": "1", "name": "Player 1"},
+        # ... all participants
+    ],
+    "rounds": [
+        {
+            "round_number": 1,
+            "matchups": [
+                {
+                    "player1": {"type": "player", "id": "0", "name": "Player 0"},
+                    "player2": {"type": "player", "id": "1", "name": "Player 1"},
+                    "outcome": "player1_wins"
+                },
+                # ... all matchups
+            ]
+        },
+        # ... all rounds
+    ],
+    "active_participant_ids": ["0", "1", "2", "3", "4", "5", "6", "7"],
+    "win_points": 3,
+    "draw_points": 1,
+    "bye_points": 3,
+    "use_tiebreaker_sort": false,
+    "tiebreaker_min_win_pct": 0.25
+}
+```
+
+**Single Elimination:**
+```python
+{
+    "participants": [
+        {"type": "player", "id": "0", "name": "Seed 1"},
+        {"type": "player", "id": "1", "name": "Seed 2"},
+        # ... all participants
+    ],
+    "rounds": [
+        {
+            "round_number": 1,
+            "matchups": [
+                {
+                    "player1": {"type": "player", "id": "0", "name": "Seed 1"},
+                    "player2": {"type": "player", "id": "7", "name": "Seed 8"},
+                    "outcome": "player1_wins"
+                },
+                # ... all matchups
+            ]
+        }
+    ],
+    "active_participant_ids": ["0", "2", "4", "6"]  # Winners advance
+}
+```
+
+### Advanced: Reconstruction from History
+
+For maximum flexibility, reconstruct directly from round history:
+
+```python
+from cardarena_tournament_core import Swiss, Player, Round, participant_from_dict
+
+# Load from your database
+tournament_data = db.tournaments.find_one({"_id": tournament_id})
+
+# Reconstruct participants
+participants = [
+    participant_from_dict(p) for p in tournament_data["participants"]
+]
+
+# Reconstruct rounds
+rounds = [Round.from_dict(r) for r in tournament_data["rounds"]]
+
+# Reconstruct Swiss state
+swiss = Swiss.from_history(
+    participants=participants,
+    rounds=rounds,
+    active_participant_ids=set(tournament_data["active_participant_ids"]),
+    win_points=tournament_data.get("win_points", 3),
+    draw_points=tournament_data.get("draw_points", 1),
+    bye_points=tournament_data.get("bye_points", 3),
+    use_tiebreaker_sort=tournament_data.get("use_tiebreaker_sort", False),
+    tiebreaker_min_win_pct=tournament_data.get("tiebreaker_min_win_pct", 0.25)
+)
+
+# Continue tournament
+next_round = swiss.pair()
+```
+
+### Validation & Error Handling
+
+Reconstruction validates all input data:
+
+```python
+from cardarena_tournament_core import PairingStateError
+
+try:
+    swiss = Swiss.from_history(
+        participants=participants,
+        rounds=rounds,
+        active_participant_ids=active_ids
+    )
+except PairingStateError as e:
+    # Handles:
+    # - Incomplete rounds (pending matchups)
+    # - Unknown participant IDs in active set
+    # - Invalid round data
+    print(f"Reconstruction failed: {e}")
+```
+
+### Best Practices
+
+1. **Always validate before saving:**
+   ```python
+   # Ensure round is complete before serializing
+   if not round_.is_complete:
+       raise ValueError("Cannot save incomplete round")
+   
+   state = swiss.to_dict()
+   db.save(state)
+   ```
+
+2. **Store configuration explicitly:**
+   ```python
+   # Don't rely on defaults — store all config
+   state = swiss.to_dict()
+   assert "win_points" in state
+   assert "use_tiebreaker_sort" in state
+   ```
+
+3. **Version your schema:**
+   ```python
+   state = swiss.to_dict()
+   state["schema_version"] = "1.0"
+   db.save(state)
+   ```
+
+4. **Handle participant drops:**
+   ```python
+   # Active IDs track who's still playing
+   swiss.remove_active_participant("player_7")
+   state = swiss.to_dict()
+   # state["active_participant_ids"] excludes "player_7"
+   ```
+
+5. **Test reconstruction in CI:**
+   ```python
+   # Verify state preservation
+   original = Swiss(players)
+   # ... play rounds ...
+   
+   state = original.to_dict()
+   reconstructed = Swiss.from_dict(state)
+   
+   assert original.rounds == reconstructed.rounds
+   assert original.active_participant_ids == reconstructed.active_participant_ids
+   ```
 
 ---
 
@@ -246,6 +521,9 @@ from cardarena_tournament_core import (
     Player, Team, Participant,
     Matchup, MatchupOutcome,
     Round, Standing,
+    # Serialization helpers
+    participant_to_dict, participant_from_dict,
+    # Errors
     TournamentCompleteError,
     # Pairings
     BasePairing, Swiss, RoundRobin, SingleElimination,
