@@ -6,6 +6,9 @@ requires-python = ">=3.11"
 name = "cardarena-tournament-core"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "ruff" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -20,6 +23,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.14" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "ruff", specifier = ">=0.15.10" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.10" },
 ]
 provides-extras = ["dev"]

@@ -25,7 +25,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "ruff>=0.15.10",
+]
 
 [project.urls]
 Homepage = "https://github.com/KataCards/cardarena-tournament-core"
