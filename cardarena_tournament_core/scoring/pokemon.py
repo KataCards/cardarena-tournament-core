@@ -18,7 +18,7 @@ class PokemonTCG(TCGBaseScoring):
         2. OOWP — Opponents' Opponents' Win Percentage
 
     Win percentages are floored at 25 % per official rules. Output standings are sorted by points, then OWP, then OOWP in percentage.
-    This means that a player with 3 points and 25% OWP would rank above
+    This means that, among players with equal points, a player with more then 25% OWP would rank above a player with a lower OWP; if OWP is also equal, OOWP is used.
     """
 
     WIN_POINTS: ClassVar[int] = 3
