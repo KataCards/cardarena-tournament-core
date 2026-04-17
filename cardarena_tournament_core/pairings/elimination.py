@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 
 from cardarena_tournament_core.common.errors import PairingStateError, TournamentCompleteError
 from cardarena_tournament_core.common.models import (
@@ -175,7 +176,7 @@ class SingleElimination(BasePairing):
 
         return instance
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Export tournament state for persistence.
 
         Returns:
@@ -191,7 +192,7 @@ class SingleElimination(BasePairing):
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "SingleElimination":
+    def from_dict(cls, data: dict[str, Any]) -> "SingleElimination":
         """Reconstruct tournament from serialized state.
 
         Args:

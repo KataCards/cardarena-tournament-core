@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 from cardarena_tournament_core.common.errors import (
     MatchupValidationError,
@@ -42,12 +43,12 @@ class Player:
         if not self.name:
             raise ParticipantValidationError("Player name cannot be empty.")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize player to dictionary."""
         return {"type": "player", "id": self.id, "name": self.name}
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Player":
+    def from_dict(cls, data: dict[str, Any]) -> "Player":
         """Deserialize player from dictionary."""
         return cls(id=data["id"], name=data["name"])
 
@@ -79,7 +80,7 @@ class Team:
         if not self.members:
             raise TeamValidationError("Team must have at least one member.")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize team to dictionary."""
         return {
             "type": "team",
@@ -89,7 +90,7 @@ class Team:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Team":
+    def from_dict(cls, data: dict[str, Any]) -> "Team":
         """Deserialize team from dictionary."""
         return cls(
             id=data["id"],
@@ -106,12 +107,12 @@ Participant = Player | Team
 # Participant serialization helpers
 # -------------------------------------------------------------------------
 
-def participant_to_dict(participant: Participant) -> dict:
+def participant_to_dict(participant: Participant) -> dict[str, Any]:
     """Serialize a Participant (Player or Team) to dictionary."""
     return participant.to_dict()
 
 
-def participant_from_dict(data: dict) -> Participant:
+def participant_from_dict(data: dict[str, Any]) -> Participant:
     """Deserialize a Participant from dictionary.
 
     Raises:
@@ -157,7 +158,7 @@ class Matchup:
         """``True`` when the matchup no longer requires manual input."""
         return self.is_bye or self.outcome != MatchupOutcome.PENDING
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize matchup to dictionary."""
         return {
             "player1": participant_to_dict(self.player1),
@@ -166,7 +167,7 @@ class Matchup:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Matchup":
+    def from_dict(cls, data: dict[str, Any]) -> "Matchup":
         """Deserialize matchup from dictionary."""
         return cls(
             player1=participant_from_dict(data["player1"]),
@@ -200,7 +201,7 @@ class Round:
                 return matchup
         return None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize round to dictionary."""
         return {
             "round_number": self.round_number,
@@ -208,7 +209,7 @@ class Round:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Round":
+    def from_dict(cls, data: dict[str, Any]) -> "Round":
         """Deserialize round from dictionary."""
         return cls(
             round_number=data["round_number"],

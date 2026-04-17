@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import Any
 
 from cardarena_tournament_core.common.errors import (
     PairingConfigurationError,
@@ -294,7 +295,7 @@ class Swiss(BasePairing):
 
         return instance
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Export tournament state for persistence.
 
         Returns a dictionary containing all data needed to reconstruct this
@@ -327,7 +328,7 @@ class Swiss(BasePairing):
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Swiss":
+    def from_dict(cls, data: dict[str, Any]) -> "Swiss":
         """Reconstruct tournament from serialized state.
 
         Convenience wrapper around from_history() that accepts the dictionary
