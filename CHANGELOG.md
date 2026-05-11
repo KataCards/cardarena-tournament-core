@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-05-11)
+
+### Features
+
+- Added union arena sub logic
+  ([`3f8886d`](https://github.com/KataCards/cardarena-tournament-core/commit/3f8886dbf00c73e9806cbfe69625140c4a4b64b2))
+
+
 ## v1.1.0 (2026-04-17)
 
 ### Bug Fixes
