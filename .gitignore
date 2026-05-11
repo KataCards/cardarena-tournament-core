@@ -28,6 +28,8 @@ MANIFEST
 .DS_Store
 .ds_store
 docs/*
+docs/superpowers/
+docs/superpowers/**
 .claude/*
 
 

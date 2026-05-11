@@ -236,6 +236,7 @@ class Standing:
     The ``tiebreakers`` dict holds format-specific secondary sort values, e.g.:
     - Pokémon TCG: ``{"owp": 0.667, "oowp": 0.500}``
     - Yu-Gi-Oh! TCG: ``{"owp": 0.667, "oowp": 0.500}``
+    - Union Arena: ``{"mw_pct": 0.667, "omw_pct": 0.407}``
     """
 
     player: Participant

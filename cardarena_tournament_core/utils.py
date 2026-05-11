@@ -218,3 +218,75 @@ def yugioh_tiebreak_number(
 
 
 __all__ = ["win_percentage", "real_opponent_ids", "owp", "oowp", "yugioh_tiebreak_number"]
+
+
+# -------------------------------------------------------------------------
+# Union Arena specific percentages
+# -------------------------------------------------------------------------
+
+
+def union_arena_mw_percentage(player_id: str, rounds: list[Round], *, min_win_pct: float = 1.0 / 3.0) -> float:
+    """Calculate Union Arena Match Win Percentage (MW%).
+
+    MW% = sum(match_points for non-bye rounds) / (non_bye_rounds * 3)
+
+    Match points per round: WIN=3, DRAW=1, LOSS=0.
+    Bye rounds are excluded from both numerator and denominator.
+    Result is floored at ``min_win_pct``. If the player has zero real games,
+    return ``min_win_pct``.
+    """
+    _validate_player_id(player_id)
+    _validate_min_win_pct(min_win_pct)
+
+    total_points = 0
+    non_bye_rounds = 0
+    for tournament_round in rounds:
+        for matchup in tournament_round.matchups:
+            if matchup.player2 is None:
+                continue
+            if matchup.player1.id == player_id:
+                non_bye_rounds += 1
+                if matchup.outcome == MatchupOutcome.PLAYER1_WINS:
+                    total_points += 3
+                elif matchup.outcome == MatchupOutcome.DRAW:
+                    total_points += 1
+            elif matchup.player2.id == player_id:
+                non_bye_rounds += 1
+                if matchup.outcome == MatchupOutcome.PLAYER2_WINS:
+                    total_points += 3
+                elif matchup.outcome == MatchupOutcome.DRAW:
+                    total_points += 1
+
+    if non_bye_rounds == 0:
+        return min_win_pct
+
+    mw_pct = total_points / (non_bye_rounds * 3)
+    return max(mw_pct, min_win_pct)
+
+
+def union_arena_omw_percentage(player_id: str, rounds: list[Round], *, min_win_pct: float = 1.0 / 3.0) -> float:
+    """Calculate Union Arena Opponents' MW% (OMW%).
+
+    OMW% is the mean of each real opponent's MW% (using
+    ``union_arena_mw_percentage``). Each opponent's MW% is floored at
+    ``min_win_pct`` before averaging. Final result is floored at
+    ``min_win_pct``. If the player has no real opponents, return 0.0.
+    """
+    _validate_player_id(player_id)
+    _validate_min_win_pct(min_win_pct)
+
+    opponent_ids = real_opponent_ids(player_id, rounds)
+    if not opponent_ids:
+        return 0.0
+
+    # compute each opponent's MW% (they are already floored by the helper)
+    opp_mw_cache: dict[str, float] = {
+        opp_id: union_arena_mw_percentage(opp_id, rounds, min_win_pct=min_win_pct)
+        for opp_id in set(opponent_ids)
+    }
+
+    avg = sum(opp_mw_cache[opp_id] for opp_id in opponent_ids) / len(opponent_ids)
+    return max(avg, min_win_pct)
+
+
+__all__.extend(["union_arena_mw_percentage", "union_arena_omw_percentage"])
