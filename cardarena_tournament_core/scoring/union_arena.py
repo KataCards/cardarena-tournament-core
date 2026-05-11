@@ -109,12 +109,12 @@ class UnionArena(TCGBaseScoring):
             # Seed pass for remaining ties: within any subgroup still tied on h2h
             k = 0
             while k < len(group):
-                l = k + 1
+                end_idx = k + 1
                 sub = [group[k]]
-                while l < len(group):
-                    if group[l].tiebreakers["_h2h_wins"] == group[k].tiebreakers["_h2h_wins"]:
-                        sub.append(group[l])
-                        l += 1
+                while end_idx < len(group):
+                    if group[end_idx].tiebreakers["_h2h_wins"] == group[k].tiebreakers["_h2h_wins"]:
+                        sub.append(group[end_idx])
+                        end_idx += 1
                     else:
                         break
 
@@ -125,7 +125,7 @@ class UnionArena(TCGBaseScoring):
                     # else: keep stable player.id-based order (already sorted by player.id)
 
                 final_order.extend(sub)
-                k = l
+                k = end_idx
 
             # cleanup temporary keys
             for s in group:
