@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cardarena-tournament-core"
-version = "2.0.0"
+version = "2.0.1"
 description = "General-purpose tournament engine: Swiss pairing, Round Robin, Single and Double Elimination formats with pluggable scoring and tiebreaker systems"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -71,3 +71,9 @@ commit_message = "chore(release): bump version to v{version} [skip ci]"
 [tool.semantic_release.branches.develop]
 match = "develop"
 prerelease = false
+
+[tool.semantic_release.commit_parser_options]
+# Only the subject of a squash commit decides the bump. Squash merges between
+# develop and main repeat the messages of commits that were already released
+# (including "BREAKING CHANGE:" footers), which would bump the version again.
+parse_squash_commits = false
