@@ -24,6 +24,15 @@ class MatchupOutcome(str, Enum):
     PLAYER1_WINS = "player1_wins"
     PLAYER2_WINS = "player2_wins"
     DRAW = "draw"
+    DOUBLE_LOSS = "double_loss"
+
+
+class Bracket(str, Enum):
+    """Which part of an elimination bracket a matchup belongs to."""
+
+    WINNERS = "winners"
+    LOSERS = "losers"
+    GRAND_FINAL = "grand_final"
 
 
 # -------------------------------------------------------------------------
@@ -148,11 +157,15 @@ class Matchup:
 
     When ``player2`` is ``None`` the match is a bye: ``player1`` wins automatically
     without facing a real opponent.
+
+    ``bracket`` is set by elimination formats to say which part of the bracket
+    the matchup belongs to; other formats leave it ``None``.
     """
 
     player1: Participant
     player2: Participant | None
     outcome: MatchupOutcome = MatchupOutcome.PENDING
+    bracket: Bracket | None = None
 
     def __post_init__(self) -> None:
         if self.player2 is not None and self.player1.id == self.player2.id:
@@ -175,16 +188,23 @@ class Matchup:
         return {
             "player1": participant_to_dict(self.player1),
             "player2": participant_to_dict(self.player2) if self.player2 else None,
-            "outcome": self.outcome.value
+            "outcome": self.outcome.value,
+            "bracket": self.bracket.value if self.bracket is not None else None,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Matchup":
-        """Deserialize matchup from dictionary."""
+        """Deserialize matchup from dictionary.
+
+        The ``bracket`` key is optional so dictionaries written before it
+        existed still load.
+        """
+        bracket_value = data.get("bracket")
         return cls(
             player1=participant_from_dict(data["player1"]),
             player2=participant_from_dict(data["player2"]) if data["player2"] else None,
-            outcome=MatchupOutcome(data["outcome"])
+            outcome=MatchupOutcome(data["outcome"]),
+            bracket=Bracket(bracket_value) if bracket_value is not None else None,
         )
 
 
@@ -257,6 +277,7 @@ __all__ = [
     "Participant",
     "Matchup",
     "MatchupOutcome",
+    "Bracket",
     "Round",
     "Standing",
     "participant_to_dict",

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cardarena-tournament-core"
-version = "1.5.0"
-description = "General-purpose tournament engine: Swiss pairing, Round Robin, Elimination formats with pluggable scoring and tiebreaker systems"
+version = "2.0.0"
+description = "General-purpose tournament engine: Swiss pairing, Round Robin, Single and Double Elimination formats with pluggable scoring and tiebreaker systems"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MPL 2.0" }

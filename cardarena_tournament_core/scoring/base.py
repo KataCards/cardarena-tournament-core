@@ -118,6 +118,9 @@ class TCGBaseScoring(BaseScoring):
                 elif matchup.outcome == MatchupOutcome.DRAW:
                     points_by_player[matchup.player1.id] += self.DRAW_POINTS
                     points_by_player[matchup.player2.id] += self.DRAW_POINTS
+                elif matchup.outcome == MatchupOutcome.DOUBLE_LOSS:
+                    points_by_player[matchup.player1.id] += self.LOSS_POINTS
+                    points_by_player[matchup.player2.id] += self.LOSS_POINTS
                 else:
                     raise ScoringValidationError(
                         "Cannot score matchup with unresolved outcome. "

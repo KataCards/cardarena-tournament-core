@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v2.0.0 (2026-11-26)
+
+### Bug Fixes
+
+- Delay losers-bracket rematches and keep a decided champion
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+### Documentation
+
+- Document double loss, bracket seeding and double elimination
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+### Features
+
+- Add double elimination pairing format
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+- Add double loss outcome and bracket label to matchups
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+- Double loss, seeded single elimination and double elimination
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+- Rebuild single elimination as a seeded fixed bracket
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+- Report final placings for bracket formats
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+- Score double loss as a played loss for both players
+  ([#21](https://github.com/KataCards/cardarena-tournament-core/pull/21),
+  [`219ecfb`](https://github.com/KataCards/cardarena-tournament-core/commit/219ecfb0ae928ac03c27f61573a2986240c6ac7b))
+
+
 ## v1.4.0 (2026-05-11)
 
 ### Features

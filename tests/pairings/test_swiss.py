@@ -546,3 +546,47 @@ def test_from_history_multiple_rounds_with_byes():
     pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
     pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
     assert pairs1 == pairs2
+
+# -------------------------------------------------------------------------
+# Double loss
+# -------------------------------------------------------------------------
+
+
+def _swiss_after_double_loss() -> Swiss:
+    swiss = Swiss(make_players(4))
+    round1 = swiss.pair()  # 0 vs 1, 2 vs 3
+    round1.matchups[0].outcome = MatchupOutcome.DOUBLE_LOSS
+    round1.matchups[1].outcome = MatchupOutcome.PLAYER1_WINS
+    swiss.submit_results(round1)
+    return swiss
+
+
+def test_swiss_double_loss_awards_no_points():
+    swiss = _swiss_after_double_loss()
+    round2 = swiss.pair()
+
+    # Player 2 is the only one with points, so they lead the pairings.
+    assert round2.matchups[0].player1.id == "2"
+
+
+def test_swiss_double_loss_pair_is_not_rematched():
+    swiss = _swiss_after_double_loss()
+    round2 = swiss.pair()
+
+    pairs = {
+        frozenset([m.player1.id, m.player2.id])
+        for m in round2.matchups
+        if m.player2 is not None
+    }
+    assert frozenset(["0", "1"]) not in pairs
+    assert len(pairs) == 2
+
+
+def test_swiss_from_dict_round_trip_with_double_loss():
+    swiss = _swiss_after_double_loss()
+    restored = Swiss.from_dict(swiss.to_dict())
+
+    assert restored.rounds[0].matchups[0].outcome is MatchupOutcome.DOUBLE_LOSS
+    assert [(m.player1.id, m.player2.id if m.player2 else None) for m in restored.pair().matchups] == [
+        (m.player1.id, m.player2.id if m.player2 else None) for m in swiss.pair().matchups
+    ]

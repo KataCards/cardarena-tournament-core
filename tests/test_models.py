@@ -498,3 +498,42 @@ def test_round_is_complete_property_some_incomplete():
     )
     
     assert round_obj.is_complete is False
+
+# -------------------------------------------------------------------------
+# Double loss outcome and bracket label
+# -------------------------------------------------------------------------
+
+_A = Player(id="a", name="A")
+_B = Player(id="b", name="B")
+
+
+def test_double_loss_outcome_value():
+    assert MatchupOutcome.DOUBLE_LOSS.value == "double_loss"
+    assert MatchupOutcome("double_loss") is MatchupOutcome.DOUBLE_LOSS
+
+
+def test_double_loss_matchup_is_complete():
+    m = Matchup(player1=_A, player2=_B, outcome=MatchupOutcome.DOUBLE_LOSS)
+    assert m.is_complete
+
+
+def test_matchup_bracket_defaults_to_none_and_round_trips():
+    from cardarena_tournament_core.common.models import Bracket
+
+    assert Matchup(player1=_A, player2=_B).bracket is None
+    m = Matchup(player1=_A, player2=_B, bracket=Bracket.LOSERS)
+    assert m.to_dict()["bracket"] == "losers"
+    assert Matchup.from_dict(m.to_dict()).bracket is Bracket.LOSERS
+    assert Matchup(player1=_A, player2=_B).to_dict()["bracket"] is None
+
+
+def test_bracket_values():
+    from cardarena_tournament_core.common.models import Bracket
+
+    assert [b.value for b in Bracket] == ["winners", "losers", "grand_final"]
+
+
+def test_matchup_from_dict_without_bracket_key():
+    """Dictionaries written by 1.x have no bracket key and must still load."""
+    data = {"player1": _A.to_dict(), "player2": _B.to_dict(), "outcome": "draw"}
+    assert Matchup.from_dict(data).bracket is None

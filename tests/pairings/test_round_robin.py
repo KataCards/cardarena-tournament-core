@@ -104,3 +104,13 @@ def test_remove_active_participant_raises_with_clear_message():
     rr = RoundRobin(make_players(4))
     with pytest.raises(PairingStateError, match="not supported for Round Robin"):
         rr.remove_active_participant("0")
+
+def test_round_robin_accepts_double_loss():
+    rr = RoundRobin(make_players(4))
+    round1 = rr.pair()
+    for matchup in round1.matchups:
+        matchup.outcome = MatchupOutcome.DOUBLE_LOSS
+    rr.submit_results(round1)
+
+    assert rr.rounds[0].matchups[0].outcome is MatchupOutcome.DOUBLE_LOSS
+    assert rr.pair().round_number == 2

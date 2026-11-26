@@ -17,6 +17,7 @@ from cardarena_tournament_core.common.errors import (
     ValidationError,
 )
 from cardarena_tournament_core.common.models import (
+    Bracket,
     Matchup,
     MatchupOutcome,
     Participant,
@@ -27,7 +28,13 @@ from cardarena_tournament_core.common.models import (
     participant_from_dict,
     participant_to_dict,
 )
-from cardarena_tournament_core.pairings import BasePairing, RoundRobin, SingleElimination, Swiss
+from cardarena_tournament_core.pairings import (
+    BasePairing,
+    DoubleElimination,
+    RoundRobin,
+    SingleElimination,
+    Swiss,
+)
 from cardarena_tournament_core.scoring import BaseScoring, PokemonTCG, YuGiOh, UnionArena
 from cardarena_tournament_core.tournament import Tournament
 
@@ -38,6 +45,7 @@ __all__ = [
     "Participant",
     "Matchup",
     "MatchupOutcome",
+    "Bracket",
     "Round",
     "Standing",
     # Serialization helpers
@@ -65,6 +73,7 @@ __all__ = [
     "Swiss",
     "RoundRobin",
     "SingleElimination",
+    "DoubleElimination",
     # Scoring systems
     "BaseScoring",
     "PokemonTCG",
