@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v2.0.1 (2026-11-26)
+
+### Bug Fixes
+
+- **ci**: Stop the version bump from tagging and re-reading released commits
+  ([#24](https://github.com/KataCards/cardarena-tournament-core/pull/24),
+  [`eab53fe`](https://github.com/KataCards/cardarena-tournament-core/commit/eab53fe89aecec6c1a629fc2702f630681aa0115))
+
+
 ## v2.0.0 (2026-11-26)
 
 ### Bug Fixes
