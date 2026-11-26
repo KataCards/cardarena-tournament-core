@@ -45,8 +45,12 @@ jobs:
 
       - name: Bump version in pyproject.toml
         # --no-tag: commit and push the version bump but do not create a git tag.
+        # --no-vcs-release: do not create a GitHub Release either. A release
+        # creates its tag on GitHub, and publish.yml aborts when the tag exists.
+        # env -u GITHUB_OUTPUT: with --no-tag PSR never sets its commit_sha
+        # output and fails the job after pushing; this step uses no outputs.
         # If no release-worthy commits exist (e.g. only chore:/docs:) PSR exits
         # cleanly with no changes.
-        run: semantic-release version --no-tag
+        run: env -u GITHUB_OUTPUT semantic-release version --no-tag --no-vcs-release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
