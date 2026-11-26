@@ -71,3 +71,9 @@ commit_message = "chore(release): bump version to v{version} [skip ci]"
 [tool.semantic_release.branches.develop]
 match = "develop"
 prerelease = false
+
+[tool.semantic_release.commit_parser_options]
+# Only the subject of a squash commit decides the bump. Squash merges between
+# develop and main repeat the messages of commits that were already released
+# (including "BREAKING CHANGE:" footers), which would bump the version again.
+parse_squash_commits = false
