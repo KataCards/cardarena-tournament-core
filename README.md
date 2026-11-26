@@ -139,11 +139,13 @@ How the bracket works:
 - **Walkovers.** If a participant's opponent slot is empty — after a double loss or a withdrawal — they advance with a bye matchup (`player2=None`) in that round.
 - **Results.** A matchup must end `PLAYER1_WINS`, `PLAYER2_WINS` or `DOUBLE_LOSS`. A draw raises `PairingStateError`.
 - **Withdrawals.** `remove_active_participant()` takes a participant out of future rounds; their next opponent gets a walkover.
-- **Completion.** The tournament is complete as soon as at most one participant is still active — `is_complete` is `True`, `champion` returns the winner, and `pair()` raises `TournamentCompleteError`.
+- **Completion.** The tournament is complete as soon as at most one participant is still active — `is_complete` is `True`, `champion` returns the winner, and `pair()` raises `TournamentCompleteError`. A champion decided on the bracket stays the champion even if they are marked inactive afterwards. If a round was paired before the last withdrawal it can still be submitted and may change the result, so treat completion as final only when no paired round is outstanding.
 - **Placings.** `placements()` returns a `Standing` for every participant. Participants who went out in the same round share a rank; `points` is the number of real match wins.
 - **Labels.** Every matchup carries `bracket=Bracket.WINNERS`.
 
 `submit_results()` checks the round against the bracket. Each matchup must be a pending match (its two participants, in either order) or a bye for one of them; anything else raises `PairingStateError` and changes nothing. A participant of a pending match who is missing from the submitted round is treated as withdrawn.
+
+> **Always submit the whole round.** Leaving a pending match out of a submitted round withdraws both of its participants without an error.
 
 ### Double Elimination
 
@@ -179,7 +181,7 @@ Each match is played in the earliest round after both of its feeder matches. For
 | 7 | Second grand final (only if needed) |
 
 - **Grand final reset.** With `grand_final_reset=True`, if the losers-bracket champion wins the grand final, both finalists have one loss and a second, deciding grand final is played. With `grand_final_reset=False` the first grand final decides.
-- **Losers bracket.** Players dropping from the winners bracket enter in reversed bracket order, so rematches come as late as possible.
+- **Losers bracket.** Players dropping from the winners bracket cross over to a different part of the losers bracket each round, so two players who already met cannot meet again before the bracket forces it (32 participants: not before round 6).
 - **Withdrawals** remove a participant from the whole event; they do not drop into the losers bracket.
 - Seeding, byes, walkovers, completion, placings and the `submit_results()` checks work as in single elimination.
 

@@ -329,3 +329,78 @@ def test_from_history_rejects_incomplete_round():
 
     with pytest.raises(PairingStateError, match="incomplete round 1"):
         DoubleElimination.from_history(players(4), [de.pair()], {"p1"})
+
+
+# -------------------------------------------------------------------------
+# Losers-bracket drop arrangement: rematches come as late as possible
+# -------------------------------------------------------------------------
+
+
+def _earliest_possible_rematch_stage(n: int) -> int:
+    """Earliest stage in which two players who met in the winners bracket can
+    meet again in the losers bracket, derived from the bracket graph."""
+    from cardarena_tournament_core.pairings._bracket import LoserOf, MatchNode, Seed, Source
+
+    de = DoubleElimination(players(n))
+    nodes: dict[int, MatchNode] = {node.id: node for node in de._nodes}
+
+    def under(node: MatchNode) -> set[str]:
+        """Everyone who can play in a winners node."""
+        found: set[str] = set()
+        for source in (node.source1, node.source2):
+            if isinstance(source, Seed):
+                if source.participant is not None:
+                    found.add(source.participant.id)
+            else:
+                found |= under(nodes[source.node_id])
+        return found
+
+    winners = [node for node in nodes.values() if node.bracket is W]
+    members = {node.id: under(node) for node in winners}
+
+    def met_in(a: str, b: str) -> int:
+        """Winners round in which a and b would meet."""
+        return min(node.stage for node in winners if {a, b} <= members[node.id])
+
+    def reach(source: Source) -> set[tuple[str, int]]:
+        """(participant, winners round they lost in) that can sit in a losers slot."""
+        assert not isinstance(source, Seed)
+        node = nodes[source.node_id]
+        if isinstance(source, LoserOf):
+            return {(pid, node.stage) for pid in members[node.id]}
+        return reach(node.source1) | reach(node.source2)
+
+    stages = [
+        node.stage
+        for node in nodes.values()
+        if node.bracket is L
+        for a, lost_a in reach(node.source1)
+        for b, lost_b in reach(node.source2)
+        if lost_a != lost_b and met_in(a, b) == min(lost_a, lost_b)
+    ]
+    return min(stages)
+
+
+@pytest.mark.parametrize("n,stage", [(4, 3), (8, 4), (16, 5), (32, 6), (64, 8)])
+def test_winners_bracket_opponents_cannot_rematch_before(n: int, stage: int):
+    assert _earliest_possible_rematch_stage(n) == stage
+
+
+def test_16_players_drop_arrangement():
+    de = DoubleElimination(players(16))
+    play(de, de.pair())
+    play(de, de.pair())
+
+    r3 = de.pair()
+    # W2 losers (p8, p5, p7, p6 in bracket order) enter L2 with the two
+    # halves swapped, facing the L1 winners p16, p13, p15, p14.
+    assert ids(r3)[2:] == [("p16", "p7"), ("p13", "p6"), ("p15", "p8"), ("p14", "p5")]
+
+
+def test_champion_marked_inactive_after_first_grand_final_stays_champion():
+    de = _eight_to_grand_final()
+    play(de, de.pair())  # p1 wins the grand final outright
+    de.remove_active_participant("p1")
+
+    assert de.champion is not None and de.champion.id == "p1"
+    assert ranks(de)[:2] == [("p1", 1), ("p2", 2)]

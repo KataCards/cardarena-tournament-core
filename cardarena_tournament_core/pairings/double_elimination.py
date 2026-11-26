@@ -17,6 +17,37 @@ from cardarena_tournament_core.pairings._bracket import (
 )
 
 
+def _drop_masks(winners_round_count: int) -> list[int]:
+    """Where the losers of each winners round enter the losers bracket.
+
+    ``masks[k]`` belongs to winners round ``k + 1``: the loser of its match
+    ``j`` enters losers match ``j ^ masks[k]`` of round ``L(2k)``.  XOR-ing
+    with a mask swaps halves, quarters, ... of the bracket.
+
+    Losers of earlier winners rounds are already sitting in the losers
+    bracket; in round ``L(2k)`` a loser of winners round ``j + 1`` sits at
+    offset ``masks[j] >> (k - j)`` from their original bracket position.  A
+    rematch becomes possible when a new drop lands on such an offset.  Each
+    mask is therefore chosen to differ from all earlier offsets in the
+    highest bits possible, which keeps players who already met apart for as
+    many rounds as the bracket allows.  Ties go to the smaller mask.
+    """
+    masks = [0]  # losers of W1 enter L1 in bracket order
+    for k in range(1, winners_round_count):
+        earlier_offsets = [masks[j] >> (k - j) for j in range(k)]
+        candidates = range(2 ** (winners_round_count - k - 1))
+        masks.append(
+            max(
+                candidates,
+                key=lambda mask: (
+                    sorted((mask ^ offset).bit_length() for offset in earlier_offsets),
+                    -mask,
+                ),
+            )
+        )
+    return masks
+
+
 class DoubleElimination(BracketPairing):
     """Double-elimination bracket: a participant is out after two losses.
 
@@ -41,9 +72,12 @@ class DoubleElimination(BracketPairing):
 
     Losers bracket layout.  ``L1`` pairs the losers of adjacent ``W1`` matches.
     Every even round ``L(2k)`` plays the previous losers-round winners against
-    the losers dropping from ``W(k+1)``; the drops enter in reversed bracket
-    order so that rematches come as late as possible.  Every odd round after
-    ``L1`` pairs the previous losers-round winners with each other.
+    the losers dropping from ``W(k+1)``.  The drops cross over to a different
+    part of the bracket each round (halves, then quarters, ... swapped), so
+    that two players who met in the winners bracket cannot meet again before
+    the bracket forces it: with 32 participants not before round 6, with 64
+    not before round 8.  Every odd round after ``L1`` pairs the previous
+    losers-round winners with each other.
 
     Matchups carry a :class:`Bracket` label.  They must end ``PLAYER1_WINS``,
     ``PLAYER2_WINS`` or ``DOUBLE_LOSS``.  A double loss eliminates both
@@ -87,6 +121,7 @@ class DoubleElimination(BracketPairing):
                 )
                 for i in range(len(first) // 2)
             ]
+            drop_masks = _drop_masks(winners_round_count)
             for k in range(1, winners_round_count):
                 drops = winners[k]
                 previous = [
@@ -94,7 +129,7 @@ class DoubleElimination(BracketPairing):
                         2 * k + 1,
                         Bracket.LOSERS,
                         WinnerOf(previous[i].id),
-                        LoserOf(drops[len(drops) - 1 - i].id),
+                        LoserOf(drops[i ^ drop_masks[k]].id),
                     )
                     for i in range(len(drops))
                 ]

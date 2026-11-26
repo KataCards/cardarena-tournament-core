@@ -609,3 +609,37 @@ def test_placements_champion_who_withdraws_afterwards_keeps_first_place():
     se.remove_active_participant("p1")
 
     assert ranks(se) == [("p1", 1), ("p2", 2)]
+    assert se.champion is not None and se.champion.id == "p1"
+    assert se.is_complete
+
+
+def test_finalist_who_withdraws_after_pairing_and_wins_is_champion():
+    se = SingleElimination(players(2))
+    r1 = se.pair()
+    se.remove_active_participant("p1")
+
+    play(se, r1)
+
+    assert se.is_complete
+    assert se.champion is not None and se.champion.id == "p1"
+    assert ranks(se) == [("p1", 1), ("p2", 2)]
+    with pytest.raises(TournamentCompleteError, match="P1"):
+        se.pair()
+
+
+def test_from_history_without_champion_in_active_set_keeps_champion():
+    live = _run_to_end(SingleElimination(players(4)))
+
+    rebuilt = SingleElimination.from_history(players(4), live.rounds, set())
+
+    assert rebuilt.champion is not None and rebuilt.champion.id == "p1"
+
+
+def test_two_withdrawn_survivors_means_no_champion():
+    se = SingleElimination(players(4))
+    play(se, se.pair())
+    se.remove_active_participant("p1")
+    se.remove_active_participant("p2")
+
+    assert se.is_complete
+    assert se.champion is None

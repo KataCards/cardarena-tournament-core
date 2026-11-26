@@ -317,14 +317,30 @@ class BracketPairing(BasePairing):
 
     @property
     def is_complete(self) -> bool:
-        """``True`` once at most one participant is still active."""
+        """``True`` once at most one participant is still active.
+
+        A round that was paired before the last withdrawal can still be
+        submitted and may change the result, so treat completion as final only
+        when no paired round is outstanding.
+        """
         return len(self._active_ids) <= 1
 
     @property
     def champion(self) -> Participant | None:
-        """The winner, or ``None`` while running or if everyone withdrew."""
-        if len(self._active_ids) == 1:
+        """The winner, or ``None`` while running or if everyone withdrew.
+
+        Once decided on the bracket, the champion stays the champion even if
+        they are marked inactive afterwards.
+        """
+        if not self.is_complete:
+            return None
+        if self._active_ids:
             return self._by_id[next(iter(self._active_ids))]
+        # Nobody is active.  If results put everyone else out, the one
+        # participant left in the bracket won it and withdrew afterwards.
+        still_in_bracket = [p for p in self._participants if p.id not in self._exits]
+        if len(still_in_bracket) == 1:
+            return still_in_bracket[0]
         return None
 
     def placements(self) -> list[Standing]:
