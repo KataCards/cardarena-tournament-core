@@ -17,6 +17,7 @@ from cardarena_tournament_core.common.errors import (
     ValidationError,
 )
 from cardarena_tournament_core.common.models import (
+    Bracket,
     Matchup,
     MatchupOutcome,
     Participant,
@@ -38,6 +39,7 @@ __all__ = [
     "Participant",
     "Matchup",
     "MatchupOutcome",
+    "Bracket",
     "Round",
     "Standing",
     # Serialization helpers

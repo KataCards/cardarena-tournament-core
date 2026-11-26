@@ -51,3 +51,9 @@ def test_abstract_base_classes_importable_for_extension():
 
     assert BasePairing is not None
     assert BaseScoring is not None
+
+def test_bracket_importable_from_root_and_common():
+    from cardarena_tournament_core import Bracket
+    from cardarena_tournament_core.common import Bracket as CommonBracket
+
+    assert Bracket is CommonBracket
