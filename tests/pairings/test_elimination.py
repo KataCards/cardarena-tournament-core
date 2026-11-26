@@ -1,376 +1,518 @@
 import pytest
 
-from cardarena_tournament_core.common.errors import PairingStateError, TournamentCompleteError
-from cardarena_tournament_core.common.models import MatchupOutcome, Player, Round
+from cardarena_tournament_core.common.errors import (
+    PairingConfigurationError,
+    PairingStateError,
+    TournamentCompleteError,
+)
+from cardarena_tournament_core.common.models import (
+    Bracket,
+    Matchup,
+    MatchupOutcome,
+    Player,
+    Round,
+    Team,
+)
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 
-
-def make_players(n: int) -> list[Player]:
-    return [Player(id=str(i), name=f"P{i}") for i in range(n)]
+from tests.pairings.helpers import ids, pair_of, play, players, set_outcomes
 
 
-def test_first_round_4_players_produces_2_matchups():
-    elim = SingleElimination(make_players(4))
-    r = elim.pair()
-    real = [m for m in r.matchups if m.player2 is not None]
-    assert len(real) == 2
+# -------------------------------------------------------------------------
+# Configuration
+# -------------------------------------------------------------------------
 
 
-def test_first_round_seeded_1v4_2v3():
-    players = make_players(4)
-    elim = SingleElimination(players)
-    r = elim.pair()
-
-    pairs = {frozenset([m.player1.id, m.player2.id]) for m in r.matchups if m.player2}
-    assert frozenset(["0", "3"]) in pairs  # P0 (seed 1) vs P3 (seed 4)
-    assert frozenset(["1", "2"]) in pairs  # P1 (seed 2) vs P2 (seed 3)
+def test_requires_at_least_one_participant():
+    with pytest.raises(PairingConfigurationError):
+        SingleElimination([])
 
 
-def test_winners_advance_to_next_round():
-    players = make_players(4)
-    elim = SingleElimination(players)
-    r1 = elim.pair()
-
-    # P0 and P1 win
-    for m in r1.matchups:
-        m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim.submit_results(r1)
-
-    r2 = elim.pair()
-    assert len(r2.matchups) == 1
-
-    r1_winners = {m.player1.id for m in r1.matchups if m.player2 is not None}
-    r2_player_ids = {r2.matchups[0].player1.id, r2.matchups[0].player2.id} # type: ignore
-    assert r2_player_ids == r1_winners
+def test_rejects_duplicate_ids():
+    with pytest.raises(PairingConfigurationError, match="unique"):
+        SingleElimination([Player(id="x", name="A"), Player(id="x", name="B")])
 
 
-def test_odd_players_gives_bye():
-    elim = SingleElimination(make_players(5))
-    r = elim.pair()
-
-    byes = [m for m in r.matchups if m.player2 is None]
-    assert len(byes) == 1
+# -------------------------------------------------------------------------
+# Seeding and round structure
+# -------------------------------------------------------------------------
 
 
-def test_bye_player_advances_automatically():
-    players = make_players(3)  # P0 vs P2, P1 gets bye
-    elim = SingleElimination(players)
-    r1 = elim.pair()
+def test_round1_seeding_8():
+    r = SingleElimination(players(8)).pair()
 
-    real_m = next(m for m in r1.matchups if m.player2 is not None)
-    real_m.outcome = MatchupOutcome.PLAYER1_WINS  # winner of real match advances
-    elim.submit_results(r1)
-
-    r2 = elim.pair()
-    r2_player_ids = {r2.matchups[0].player1.id}
-    if r2.matchups[0].player2 is not None:
-        r2_player_ids.add(r2.matchups[0].player2.id)
-
-    # Bye player and real-match winner should both be in round 2
-    bye_m = next(m for m in r1.matchups if m.player2 is None)
-    assert bye_m.player1.id in r2_player_ids
-    assert real_m.player1.id in r2_player_ids
+    assert ids(r) == [("p1", "p8"), ("p4", "p5"), ("p2", "p7"), ("p3", "p6")]
+    assert all(m.bracket is Bracket.WINNERS for m in r.matchups)
+    assert r.round_number == 1
 
 
-def test_tournament_complete_error_when_champion_found():
-    players = make_players(2)
-    elim = SingleElimination(players)
-    r1 = elim.pair()
-    r1.matchups[0].outcome = MatchupOutcome.PLAYER1_WINS
-    elim.submit_results(r1)
+def test_round1_byes_go_to_top_seeds_5():
+    r = SingleElimination(players(5)).pair()
 
-    with pytest.raises(TournamentCompleteError):
-        elim.pair()
+    assert ids(r) == [("p1", None), ("p4", "p5"), ("p2", None), ("p3", None)]
 
 
-def test_tournament_complete_error_single_player():
-    elim = SingleElimination(make_players(1))
-
-    with pytest.raises(TournamentCompleteError):
-        elim.pair()
+def test_round1_3_players():
+    assert ids(SingleElimination(players(3)).pair()) == [("p1", None), ("p2", "p3")]
 
 
-def test_tournament_complete_error_when_all_participants_eliminated():
-    elim = SingleElimination(make_players(2))
-    elim._active_ids = set()  # clear active roster directly
+def test_round2_pairs_adjacent_winners():
+    se = SingleElimination(players(8))
+    play(se, se.pair())
 
-    with pytest.raises(TournamentCompleteError, match="All participants have been eliminated"):
-        elim.pair()
+    r2 = se.pair()
 
-
-def test_round_numbers_increment():
-    elim = SingleElimination(make_players(4))
-    r1 = elim.pair()
-    assert r1.round_number == 1
-    for m in r1.matchups:
-        m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim.submit_results(r1)
-    r2 = elim.pair()
+    assert ids(r2) == [("p1", "p4"), ("p2", "p3")]
     assert r2.round_number == 2
 
 
-def test_draw_outcome_rejected_in_single_elimination():
-    elim = SingleElimination(make_players(2))
-    round1 = elim.pair()
-    round1.matchups[0].outcome = MatchupOutcome.DRAW
+def test_bye_player_advances_to_round2():
+    se = SingleElimination(players(5))
+    play(se, se.pair(), winners={"p5"})
 
-    with pytest.raises(PairingStateError, match="must end with PLAYER1_WINS or PLAYER2_WINS"):
-        elim.submit_results(round1)
+    assert ids(se.pair()) == [("p1", "p5"), ("p2", "p3")]
 
 
-def test_submit_results_with_no_matchups_raises_pairing_state_error():
-    elim = SingleElimination(make_players(2))
-    empty_round = Round(round_number=1, matchups=[])
+def test_full_run_8_champion():
+    se = SingleElimination(players(8))
+    for expected_rounds_left in (3, 2, 1):
+        assert not se.is_complete
+        assert se.champion is None
+        play(se, se.pair())
+        assert len(se.rounds) == 4 - expected_rounds_left
 
-    with pytest.raises(PairingStateError, match="no advancing participants"):
-        elim.submit_results(empty_round)
+    assert se.is_complete
+    assert se.champion is not None and se.champion.id == "p1"
+    assert se.active_participant_ids == {"p1"}
+    with pytest.raises(TournamentCompleteError, match="P1"):
+        se.pair()
 
 
 def test_player2_win_advances_player2():
-    elim = SingleElimination(make_players(2))
-    round1 = elim.pair()
-    round1.matchups[0].outcome = MatchupOutcome.PLAYER2_WINS
-    elim.submit_results(round1)
+    se = SingleElimination(players(2))
+    play(se, se.pair(), winners={"p2"})
 
-    with pytest.raises(TournamentCompleteError, match="is the champion"):
-        elim.pair()
+    assert se.champion is not None and se.champion.id == "p2"
 
 
-def test_active_ids_updated_after_submit():
-    """After submitting round 1, only winners remain active."""
-    players = make_players(4)
-    elim = SingleElimination(players)
-    r1 = elim.pair()
-    for m in r1.matchups:
-        m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim.submit_results(r1)
+def test_single_participant_is_champion_immediately():
+    se = SingleElimination(players(1))
 
-    # P0 and P1 are winners (player1 wins in each matchup)
-    assert elim.active_participant_ids == frozenset({"0", "1"})
+    assert se.is_complete
+    assert se.champion is not None and se.champion.id == "p1"
+    with pytest.raises(TournamentCompleteError):
+        se.pair()
 
 
-def test_seeding_order_preserved_after_elimination():
-    """Active participants used in round 2 must respect original seeding order."""
-    players = make_players(4)  # seeds: P0=1, P1=2, P2=3, P3=4
-    elim = SingleElimination(players)
+def test_team_participants_work():
+    teams = [
+        Team(id=f"t{i}", name=f"T{i}", members=(Player(id=f"m{i}", name=f"M{i}"),))
+        for i in range(1, 5)
+    ]
+    se = SingleElimination(teams)
+    play(se, se.pair())
+    play(se, se.pair())
 
-    r1 = elim.pair()
-    # R1 pairs P0 vs P3 and P1 vs P2; P0 and P1 win
-    for m in r1.matchups:
-        m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim.submit_results(r1)
-
-    r2 = elim.pair()
-    assert len(r2.matchups) == 1
-    # P0 (seed 1) should be player1, P1 (seed 2) should be player2
-    assert r2.matchups[0].player1.id == "0"
-    assert r2.matchups[0].player2 is not None
-    assert r2.matchups[0].player2.id == "1"
-
-
-def test_already_paired_round_submittable_after_removal_in_elimination():
-    """Removing a player after pairing must not break submission of that round."""
-    players = make_players(4)
-    elim = SingleElimination(players)
-
-    r1 = elim.pair()           # snapshot taken with all 4 active
-    elim.remove_active_participant("3")  # remove after pairing
-
-    for m in r1.matchups:
-        m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim.submit_results(r1)    # must not raise
-    assert len(elim.rounds) == 1
+    assert se.champion is not None and se.champion.id == "t1"
 
 
 # -------------------------------------------------------------------------
-# Reconstruction tests
+# Results
 # -------------------------------------------------------------------------
+
+
+def test_draw_rejected():
+    se = SingleElimination(players(2))
+    r = se.pair()
+    r.matchups[0].outcome = MatchupOutcome.DRAW
+
+    with pytest.raises(PairingStateError, match="DRAW"):
+        se.submit_results(r)
+    assert se.rounds == []
+
+
+def test_incomplete_round_rejected():
+    se = SingleElimination(players(2))
+
+    with pytest.raises(PairingStateError, match="incomplete"):
+        se.submit_results(se.pair())
+
+
+def test_round_with_no_matchups_rejected():
+    se = SingleElimination(players(2))
+
+    with pytest.raises(PairingStateError, match="at least one matchup"):
+        se.submit_results(Round(round_number=1, matchups=[]))
+
+
+def test_double_loss_eliminates_both_and_gives_walkover():
+    se = SingleElimination(players(8))
+    play(se, se.pair(), double_loss={pair_of("p1", "p8")})
+
+    assert se.active_participant_ids == {"p4", "p2", "p3"}
+    assert ids(se.pair()) == [("p4", None), ("p2", "p3")]
+
+
+def test_double_loss_semi_ends_tournament_early():
+    se = SingleElimination(players(4))
+    play(se, se.pair(), double_loss={pair_of("p1", "p4")})
+
+    assert se.is_complete
+    assert se.champion is not None and se.champion.id == "p2"
+
+
+def test_double_loss_in_final_rejected_and_state_unchanged():
+    se = SingleElimination(players(2))
+    r = set_outcomes(se.pair(), double_loss={pair_of("p1", "p2")})
+
+    with pytest.raises(PairingStateError, match="nobody"):
+        se.submit_results(r)
+
+    assert se.rounds == []
+    assert se.active_participant_ids == {"p1", "p2"}
+    assert ids(se.pair()) == [("p1", "p2")]
+
+
+def test_both_semis_double_loss_rejected():
+    se = SingleElimination(players(4))
+    r = set_outcomes(se.pair(), double_loss={pair_of("p1", "p4"), pair_of("p2", "p3")})
+
+    with pytest.raises(PairingStateError, match="nobody"):
+        se.submit_results(r)
+    assert se.active_participant_ids == {"p1", "p2", "p3", "p4"}
+
+
+def test_double_loss_between_last_two_alive_before_final_rejected():
+    se = SingleElimination(players(8))
+    # The whole top half goes out in round 1.
+    play(se, se.pair(), double_loss={pair_of("p1", "p8"), pair_of("p4", "p5")})
+    r2 = se.pair()
+    assert ids(r2) == [("p2", "p3")]
+
+    with pytest.raises(PairingStateError, match="nobody"):
+        se.submit_results(set_outcomes(r2, double_loss={pair_of("p2", "p3")}))
+
+
+def test_walkover_only_round_is_emitted():
+    se = SingleElimination(players(8))
+    play(se, se.pair(), double_loss={pair_of("p1", "p8"), pair_of("p2", "p7")})
+
+    r2 = se.pair()
+    assert ids(r2) == [("p4", None), ("p3", None)]
+    se.submit_results(r2)
+
+    r3 = se.pair()
+    assert ids(r3) == [("p4", "p3")]
+    assert r3.round_number == 3
+
+
+# -------------------------------------------------------------------------
+# Submitted rounds are checked against the bracket
+# -------------------------------------------------------------------------
+
+P1, P2, P3, P4 = players(4)
+
+
+def test_submitted_players_swapped_reads_outcome_in_submitted_order():
+    se = SingleElimination(players(2))
+    se.pair()
+
+    se.submit_results(
+        Round(1, [Matchup(player1=P2, player2=P1, outcome=MatchupOutcome.PLAYER1_WINS)])
+    )
+
+    assert se.champion is not None and se.champion.id == "p2"
+
+
+def test_submitted_bracket_label_none_is_accepted():
+    se = SingleElimination(players(4))
+    se.pair()
+
+    se.submit_results(
+        Round(
+            1,
+            [
+                Matchup(player1=P1, player2=P4, outcome=MatchupOutcome.PLAYER1_WINS),
+                Matchup(player1=P2, player2=P3, outcome=MatchupOutcome.PLAYER1_WINS),
+            ],
+        )
+    )
+
+    assert ids(se.pair()) == [("p1", "p2")]
+
+
+def test_round_not_fitting_bracket_rejected_and_state_unchanged():
+    se = SingleElimination(players(8))
+    first = ids(se.pair())
+    wrong = Round(
+        1,
+        [
+            Matchup(player1=P1, player2=P2, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=P3, player2=P4, outcome=MatchupOutcome.PLAYER1_WINS),
+        ],
+    )
+
+    with pytest.raises(PairingStateError, match="bracket"):
+        se.submit_results(wrong)
+
+    assert se.rounds == []
+    assert len(se.active_participant_ids) == 8
+    assert ids(se.pair()) == first
+
+
+def test_same_player_in_two_matchups_rejected():
+    se = SingleElimination(players(4))
+    se.pair()
+    wrong = Round(
+        1,
+        [
+            Matchup(player1=P1, player2=P4, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=P1, player2=None),
+        ],
+    )
+
+    with pytest.raises(PairingStateError, match="more than one"):
+        se.submit_results(wrong)
+
+
+def test_matchup_from_a_later_round_rejected():
+    se = SingleElimination(players(4))
+    r1 = set_outcomes(se.pair())
+    r1.matchups.append(Matchup(player1=P1, player2=P2, outcome=MatchupOutcome.PLAYER1_WINS))
+
+    with pytest.raises(PairingStateError):
+        se.submit_results(r1)
+
+
+def test_separate_byes_for_two_players_of_one_match_rejected():
+    se = SingleElimination(players(4))
+    se.pair()
+    wrong = Round(
+        1,
+        [
+            Matchup(player1=P1, player2=None),
+            Matchup(player1=P4, player2=None),
+            Matchup(player1=P2, player2=P3, outcome=MatchupOutcome.PLAYER1_WINS),
+        ],
+    )
+
+    with pytest.raises(PairingStateError, match="same matchup"):
+        se.submit_results(wrong)
+
+
+def test_matchup_for_eliminated_player_rejected_on_replay():
+    se = SingleElimination(players(4))
+    play(se, se.pair())
+    # Submitted without pair(), as a replay does: p3 lost in round 1.
+    wrong = Round(
+        2,
+        [
+            Matchup(player1=P1, player2=P2, outcome=MatchupOutcome.PLAYER1_WINS),
+            Matchup(player1=P3, player2=None),
+        ],
+    )
+
+    with pytest.raises(PairingStateError, match="not a pending match"):
+        se.submit_results(wrong)
+    assert len(se.rounds) == 1
+
+
+def test_out_of_order_round_number_rejected():
+    se = SingleElimination(players(2))
+    r = set_outcomes(se.pair())
+    r.round_number = 2
+
+    with pytest.raises(PairingStateError, match="out of order"):
+        se.submit_results(r)
+
+
+# -------------------------------------------------------------------------
+# Withdrawals
+# -------------------------------------------------------------------------
+
+
+def test_withdraw_before_round1_gives_opponent_walkover():
+    se = SingleElimination(players(4))
+    se.remove_active_participant("p4")
+
+    assert ids(se.pair()) == [("p1", None), ("p2", "p3")]
+
+
+def test_withdraw_between_rounds_gives_walkover():
+    se = SingleElimination(players(4))
+    play(se, se.pair())
+    se.remove_active_participant("p2")
+
+    # Only p1 is left, so the event is over without a final.
+    assert se.is_complete
+    assert se.champion is not None and se.champion.id == "p1"
+
+
+def test_withdraw_between_rounds_gives_walkover_8():
+    se = SingleElimination(players(8))
+    play(se, se.pair())
+    se.remove_active_participant("p4")
+
+    assert ids(se.pair()) == [("p1", None), ("p2", "p3")]
+
+
+def test_already_paired_round_is_submittable_after_withdrawal():
+    se = SingleElimination(players(4))
+    r1 = se.pair()
+    se.remove_active_participant("p4")
+
+    play(se, r1, winners={"p4"})
+
+    # p4 won the match but has withdrawn: p4 is not paired again.
+    assert se.active_participant_ids == {"p2"}
+    assert se.is_complete
+
+
+def test_bye_submitted_for_two_player_match_withdraws_the_other():
+    se = SingleElimination(players(4))
+    se.pair()
+
+    se.submit_results(
+        Round(
+            1,
+            [
+                Matchup(player1=P1, player2=None),
+                Matchup(player1=P2, player2=P3, outcome=MatchupOutcome.PLAYER1_WINS),
+            ],
+        )
+    )
+
+    assert se.active_participant_ids == {"p1", "p2"}
+    with pytest.raises(PairingStateError, match="p4"):
+        se.reactivate_participant("p4")
+
+
+def test_pending_match_missing_from_round_withdraws_both():
+    se = SingleElimination(players(4))
+    se.pair()
+
+    se.submit_results(
+        Round(1, [Matchup(player1=P2, player2=P3, outcome=MatchupOutcome.PLAYER2_WINS)])
+    )
+
+    assert se.active_participant_ids == {"p3"}
+    assert se.champion is not None and se.champion.id == "p3"
+
+
+def test_reactivate_before_next_round_restores_match():
+    se = SingleElimination(players(4))
+    se.remove_active_participant("p4")
+    se.reactivate_participant("p4")
+
+    assert ids(se.pair()) == [("p1", "p4"), ("p2", "p3")]
+
+
+def test_reactivate_eliminated_raises():
+    se = SingleElimination(players(4))
+    play(se, se.pair())
+
+    with pytest.raises(PairingStateError, match="p4"):
+        se.reactivate_participant("p4")
+
+
+def test_remove_eliminated_raises():
+    se = SingleElimination(players(4))
+    play(se, se.pair())
+
+    with pytest.raises(PairingStateError, match="already inactive"):
+        se.remove_active_participant("p4")
+
+
+def test_everyone_withdraws_no_champion():
+    se = SingleElimination(players(2))
+    se.remove_active_participant("p1")
+    se.remove_active_participant("p2")
+
+    assert se.is_complete
+    assert se.champion is None
+    with pytest.raises(TournamentCompleteError, match="No participants"):
+        se.pair()
+
+
+# -------------------------------------------------------------------------
+# Persistence
+# -------------------------------------------------------------------------
+
+
+def _mid_event() -> SingleElimination:
+    se = SingleElimination(players(8))
+    play(se, se.pair(), double_loss={pair_of("p2", "p7")})
+    se.remove_active_participant("p4")
+    return se
+
+
+def test_to_dict_keys():
+    data = _mid_event().to_dict()
+
+    assert set(data) == {"participants", "rounds", "active_participant_ids"}
+    assert data["active_participant_ids"] == ["p1", "p3"]
+    assert [p["id"] for p in data["participants"]] == [f"p{i}" for i in range(1, 9)]
+
+
+def test_to_dict_from_dict_round_trip_next_pairing_identical():
+    original = _mid_event()
+    restored = SingleElimination.from_dict(original.to_dict())
+
+    assert restored.active_participant_ids == original.active_participant_ids
+    assert ids(restored.pair()) == ids(original.pair()) == [("p1", None), ("p3", None)]
+    assert len(restored.rounds) == 1
+
 
 def test_from_history_matches_sequential_state():
-    """CRITICAL: Verify from_history produces identical state to sequential processing."""
-    players = make_players(8)
-    
-    # Path 1: Sequential processing
-    elim1 = SingleElimination(players)
-    round1 = elim1.pair()
-    for m in round1.matchups:
-        if m.player2:
-            m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim1.submit_results(round1)
-    
-    # Path 2: Reconstruction from history
-    elim2 = SingleElimination.from_history(
-        participants=players,
-        rounds=[round1],
-        active_participant_ids=set(elim1.active_participant_ids)
+    live = SingleElimination(players(8))
+    play(live, live.pair())
+    play(live, live.pair(), winners={"p4"})
+
+    rebuilt = SingleElimination.from_history(
+        participants=players(8),
+        rounds=live.rounds,
+        active_participant_ids=set(live.active_participant_ids),
     )
-    
-    # Verify IDENTICAL internal state
-    assert elim1._active_ids == elim2._active_ids, "Active IDs must match exactly"
-    assert elim1._seeding_order == elim2._seeding_order, "Seeding order must match"
-    assert len(elim1._rounds) == len(elim2._rounds), "Round count must match"
-    
-    # Verify next pairing is IDENTICAL
-    next1 = elim1.pair()
-    next2 = elim2.pair()
-    
-    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
-    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
-    assert pairs1 == pairs2, "Next round pairings must be identical"
+
+    assert ids(rebuilt.pair()) == ids(live.pair()) == [("p4", "p2")]
 
 
-def test_from_history_rejects_incomplete_rounds():
-    """STRICT VALIDATION: Incomplete rounds must cause immediate failure."""
-    players = make_players(8)
-    elim = SingleElimination(players)
-    round1 = elim.pair()
-    # Don't set outcomes - leave incomplete
-    
-    with pytest.raises(PairingStateError, match="incomplete round"):
-        SingleElimination.from_history(
-            participants=players,
-            rounds=[round1],
-            active_participant_ids={p.id for p in players}
-        )
+def test_from_history_empty_rounds():
+    rebuilt = SingleElimination.from_history(players(4), [], {"p1", "p2", "p3", "p4"})
+
+    assert ids(rebuilt.pair()) == [("p1", "p4"), ("p2", "p3")]
 
 
-def test_from_history_rejects_unknown_active_participants():
-    """STRICT VALIDATION: Unknown active IDs must cause immediate failure."""
-    players = make_players(8)
-    
-    with pytest.raises(PairingStateError, match="unregistered participants"):
-        SingleElimination.from_history(
-            participants=players,
-            rounds=[],
-            active_participant_ids={"999"}  # Unknown ID
-        )
+def test_from_history_rejects_incomplete_round():
+    se = SingleElimination(players(4))
+    r1 = se.pair()
+
+    with pytest.raises(PairingStateError, match="incomplete round 1"):
+        SingleElimination.from_history(players(4), [r1], {"p1", "p2"})
 
 
-def test_to_dict_from_dict_roundtrip():
-    """Verify to_dict/from_dict preserves complete state."""
-    players = make_players(8)
-    elim1 = SingleElimination(players)
-    
-    round1 = elim1.pair()
-    for m in round1.matchups:
-        if m.player2:
-            m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim1.submit_results(round1)
-    
-    # Serialize and deserialize
-    data = elim1.to_dict()
-    elim2 = SingleElimination.from_dict(data)
-    
-    # Verify identical state
-    assert elim1._active_ids == elim2._active_ids
-    assert elim1._seeding_order == elim2._seeding_order
-    assert len(elim1._rounds) == len(elim2._rounds)
+def test_from_history_rejects_unknown_active_id():
+    with pytest.raises(PairingStateError, match="ghost"):
+        SingleElimination.from_history(players(4), [], {"p1", "ghost"})
 
 
-def test_from_history_with_active_override():
-    """Verify active_participant_ids override works (manual removal case)."""
-    players = make_players(8)
-    
-    elim1 = SingleElimination(players)
-    round1 = elim1.pair()
-    for m in round1.matchups:
-        if m.player2:
-            m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim1.submit_results(round1)
-    
-    # Manually remove a winner (edge case)
-    elim1.remove_active_participant("0")
-    
-    # Reconstruct with override
-    elim2 = SingleElimination.from_history(
-        participants=players,
-        rounds=[round1],
-        active_participant_ids=set(elim1.active_participant_ids)
+def test_from_history_ignores_eliminated_ids_in_active_set():
+    live = SingleElimination(players(4))
+    play(live, live.pair())
+
+    rebuilt = SingleElimination.from_history(
+        players(4), live.rounds, {"p1", "p2", "p3", "p4"}
     )
-    
-    assert elim2.active_participant_ids == elim1.active_participant_ids
-    assert "0" not in elim2.active_participant_ids
+
+    assert rebuilt.active_participant_ids == {"p1", "p2"}
 
 
-def test_from_history_multiple_rounds():
-    """Verify reconstruction handles multiple rounds correctly."""
-    players = make_players(8)
-    
-    elim1 = SingleElimination(players)
-    
-    # Round 1
-    round1 = elim1.pair()
-    for m in round1.matchups:
-        if m.player2:
-            m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim1.submit_results(round1)
-    
-    # Round 2
-    round2 = elim1.pair()
-    for m in round2.matchups:
-        if m.player2:
-            m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim1.submit_results(round2)
-    
-    # Reconstruct
-    elim2 = SingleElimination.from_history(
-        participants=players,
-        rounds=[round1, round2],
-        active_participant_ids=set(elim1.active_participant_ids)
-    )
-    
-    # Verify state matches
-    assert elim1._active_ids == elim2._active_ids
-    assert len(elim1._rounds) == len(elim2._rounds)
-    
-    # Verify next round is identical
-    next1 = elim1.pair()
-    next2 = elim2.pair()
-    
-    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
-    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
-    assert pairs1 == pairs2
+def test_from_history_withdrawal_since_last_round_can_be_reactivated():
+    live = SingleElimination(players(4))
+    play(live, live.pair())
 
+    rebuilt = SingleElimination.from_history(players(4), live.rounds, {"p1"})
+    assert rebuilt.is_complete
+    rebuilt.reactivate_participant("p2")
 
-def test_from_history_empty_rounds_list():
-    """Verify reconstruction with no rounds creates fresh state."""
-    players = make_players(8)
-    elim = SingleElimination.from_history(
-        participants=players,
-        rounds=[],
-        active_participant_ids={p.id for p in players}
-    )
-    
-    assert len(elim._rounds) == 0
-    assert elim.active_participant_ids == {p.id for p in players}
-    assert elim._seeding_order == [str(i) for i in range(8)]
-
-
-def test_from_history_with_byes():
-    """Verify reconstruction handles rounds with byes correctly."""
-    players = make_players(7)  # Odd number for bye
-    
-    elim1 = SingleElimination(players)
-    round1 = elim1.pair()
-    for m in round1.matchups:
-        if m.player2:
-            m.outcome = MatchupOutcome.PLAYER1_WINS
-    elim1.submit_results(round1)
-    
-    # Reconstruct
-    elim2 = SingleElimination.from_history(
-        participants=players,
-        rounds=[round1],
-        active_participant_ids=set(elim1.active_participant_ids)
-    )
-    
-    # Verify state matches
-    assert elim1._active_ids == elim2._active_ids
-    
-    # Verify next round is identical
-    next1 = elim1.pair()
-    next2 = elim2.pair()
-    
-    pairs1 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next1.matchups}
-    pairs2 = {frozenset([m.player1.id, m.player2.id if m.player2 else None]) for m in next2.matchups}
-    assert pairs1 == pairs2
+    assert ids(rebuilt.pair()) == [("p1", "p2")]
