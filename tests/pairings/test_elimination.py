@@ -15,7 +15,7 @@ from cardarena_tournament_core.common.models import (
 )
 from cardarena_tournament_core.pairings.elimination import SingleElimination
 
-from tests.pairings.helpers import ids, pair_of, play, players, set_outcomes
+from tests.pairings.helpers import ids, pair_of, play, players, ranks, set_outcomes
 
 
 # -------------------------------------------------------------------------
@@ -516,3 +516,96 @@ def test_from_history_withdrawal_since_last_round_can_be_reactivated():
     rebuilt.reactivate_participant("p2")
 
     assert ids(rebuilt.pair()) == [("p1", "p2")]
+
+
+# -------------------------------------------------------------------------
+# Placings
+# -------------------------------------------------------------------------
+
+
+def _run_to_end(se: SingleElimination) -> SingleElimination:
+    while not se.is_complete:
+        play(se, se.pair())
+    return se
+
+
+def test_placements_full_8():
+    se = _run_to_end(SingleElimination(players(8)))
+
+    assert ranks(se) == [
+        ("p1", 1), ("p2", 2), ("p3", 3), ("p4", 3),
+        ("p5", 5), ("p6", 5), ("p7", 5), ("p8", 5),
+    ]
+    points = {s.player.id: s.points for s in se.placements()}
+    assert points == {"p1": 3, "p2": 2, "p3": 1, "p4": 1, "p5": 0, "p6": 0, "p7": 0, "p8": 0}
+    assert all(s.tiebreakers == {} for s in se.placements())
+
+
+def test_placements_before_any_round_all_rank_1():
+    assert ranks(SingleElimination(players(3))) == [("p1", 1), ("p2", 1), ("p3", 1)]
+
+
+def test_placements_mid_event_alive_share_rank_1():
+    se = SingleElimination(players(8))
+    play(se, se.pair())
+
+    assert ranks(se) == [
+        ("p1", 1), ("p2", 1), ("p3", 1), ("p4", 1),
+        ("p5", 5), ("p6", 5), ("p7", 5), ("p8", 5),
+    ]
+
+
+def test_placements_walkover_not_counted_as_win():
+    se = _run_to_end(SingleElimination(players(5)))
+
+    points = {s.player.id: s.points for s in se.placements()}
+    assert se.champion is not None and se.champion.id == "p1"
+    assert points["p1"] == 2  # bye in round 1, then two real wins
+
+
+def test_placements_double_loss_pair_share_rank():
+    se = SingleElimination(players(8))
+    play(se, se.pair())
+    play(se, se.pair(), double_loss={pair_of("p1", "p4")})
+
+    # p2 beat p3 and is the only one left.
+    assert ranks(se)[:4] == [("p2", 1), ("p1", 2), ("p3", 2), ("p4", 2)]
+
+
+def test_placements_withdrawn_before_round1_ranks_with_round1_losers():
+    se = SingleElimination(players(4))
+    se.remove_active_participant("p4")
+    assert ranks(se) == [("p1", 1), ("p2", 1), ("p3", 1), ("p4", 4)]
+
+    play(se, se.pair())
+
+    assert ranks(se) == [("p1", 1), ("p2", 1), ("p3", 3), ("p4", 3)]
+
+
+def test_placements_withdrawn_between_rounds_ranks_with_next_round_losers():
+    se = SingleElimination(players(8))
+    play(se, se.pair())
+    se.remove_active_participant("p4")
+    assert ranks(se)[:4] == [("p1", 1), ("p2", 1), ("p3", 1), ("p4", 4)]
+
+    play(se, se.pair())
+
+    assert ranks(se)[:4] == [("p1", 1), ("p2", 1), ("p3", 3), ("p4", 3)]
+
+
+def test_placements_identical_after_from_dict():
+    se = SingleElimination(players(8))
+    play(se, se.pair(), double_loss={pair_of("p2", "p7")})
+    se.remove_active_participant("p4")
+
+    restored = SingleElimination.from_dict(se.to_dict())
+
+    assert ranks(restored) == ranks(se)
+    assert [s.points for s in restored.placements()] == [s.points for s in se.placements()]
+
+
+def test_placements_champion_who_withdraws_afterwards_keeps_first_place():
+    se = _run_to_end(SingleElimination(players(2)))
+    se.remove_active_participant("p1")
+
+    assert ranks(se) == [("p1", 1), ("p2", 2)]

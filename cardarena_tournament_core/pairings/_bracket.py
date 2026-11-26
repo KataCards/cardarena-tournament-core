@@ -10,6 +10,7 @@ resolves submitted rounds against the graph.  Concrete formats only build the
 graph and say when a loss eliminates a participant.
 """
 
+import math
 from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ from cardarena_tournament_core.common.models import (
     MatchupOutcome,
     Participant,
     Round,
+    Standing,
     participant_to_dict,
 )
 from cardarena_tournament_core.pairings.base import BasePairing
@@ -325,6 +327,34 @@ class BracketPairing(BasePairing):
             return self._by_id[next(iter(self._active_ids))]
         return None
 
+    def placements(self) -> list[Standing]:
+        """Placings of every registered participant, best first.
+
+        - ``rank`` is 1 + the number of participants who lasted longer.
+          Participants who went out in the same round share a rank (two
+          semi-final losers are both 3rd, the next rank is 5th).  Participants
+          still active share rank 1.
+        - A withdrawn participant counts as having forfeited their next
+          scheduled match and ranks with whoever goes out in that round.
+        - ``points`` is the number of real match wins (walkovers excluded).
+        - ``tiebreakers`` is empty.
+
+        Entries are ordered by rank, then seed.
+        """
+        exit_stage = {p.id: self._exit_stage(p.id) for p in self._participants}
+        seed = {p.id: index for index, p in enumerate(self._participants)}
+
+        standings = [
+            Standing(
+                player=p,
+                points=self._wins[p.id],
+                rank=1 + sum(1 for other in exit_stage.values() if other > exit_stage[p.id]),
+            )
+            for p in self._participants
+        ]
+        standings.sort(key=lambda standing: (standing.rank, seed[standing.player.id]))
+        return standings
+
     # -------------------------------------------------------------------------
     # Serialization and reconstruction
     # -------------------------------------------------------------------------
@@ -377,6 +407,20 @@ class BracketPairing(BasePairing):
         return _State(
             resolved=self._resolved, exits=self._exits, wins=self._wins, active=self._active_ids
         )
+
+    def _exit_stage(self, participant_id: str) -> float:
+        """Stage at which a participant left; ``inf`` while they are active."""
+        if participant_id in self._active_ids:
+            return math.inf
+        if participant_id in self._exits:
+            return self._exits[participant_id]
+        # Withdrawn but not yet passed over: they forfeit the match they wait in.
+        state = self._state()
+        for node in self._nodes:
+            if node.id not in state.resolved and participant_id in self._occupants(node, state):
+                return node.stage
+        # Withdrew after winning the last match: nobody outlasted them.
+        return math.inf
 
     def _stages(self) -> list[int]:
         return sorted({node.stage for node in self._nodes})

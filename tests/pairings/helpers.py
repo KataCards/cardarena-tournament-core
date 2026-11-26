@@ -3,6 +3,7 @@
 from collections.abc import Collection
 
 from cardarena_tournament_core.common.models import MatchupOutcome, Player, Round
+from cardarena_tournament_core.pairings._bracket import BracketPairing
 from cardarena_tournament_core.pairings.base import BasePairing
 
 
@@ -50,3 +51,8 @@ def play(
 
 def pair_of(a: str, b: str) -> frozenset[str]:
     return frozenset({a, b})
+
+
+def ranks(pairing: BracketPairing) -> list[tuple[str, int]]:
+    """Placings as ``(participant id, rank)`` in reported order."""
+    return [(s.player.id, s.rank) for s in pairing.placements()]
