@@ -192,3 +192,39 @@ def test_yugioh_tiebreak_number_rejects_oowp_out_of_range():
 def test_yugioh_tiebreak_number_rejects_non_positive_loss_round():
     with pytest.raises(ValueError, match="loss round numbers must be positive"):
         utils.yugioh_tiebreak_number(3, 0.5, 0.5, loss_rounds=[0])
+
+
+# -------------------------------------------------------------------------
+# Double loss
+# -------------------------------------------------------------------------
+
+
+def _double_loss_round() -> Round:
+    p0, p1, _ = make_players()
+    return Round(
+        round_number=1,
+        matchups=[Matchup(player1=p0, player2=p1, outcome=MatchupOutcome.DOUBLE_LOSS)],
+    )
+
+
+def test_double_loss_counts_as_played_loss_for_both():
+    rounds = [_double_loss_round()]
+
+    assert utils.win_percentage("p0", rounds) == 0.0
+    assert utils.win_percentage("p1", rounds) == 0.0
+    assert utils.real_opponent_ids("p0", rounds) == ["p1"]
+    assert utils.union_arena_mw_percentage("p0", rounds, min_win_pct=0.0) == 0.0
+    assert utils.union_arena_mw_percentage("p1", rounds, min_win_pct=0.0) == 0.0
+
+
+def test_double_loss_then_win_is_half():
+    p0, _, p2 = make_players()
+    rounds = [
+        _double_loss_round(),
+        Round(
+            round_number=2,
+            matchups=[Matchup(player1=p0, player2=p2, outcome=MatchupOutcome.PLAYER1_WINS)],
+        ),
+    ]
+
+    assert utils.win_percentage("p0", rounds) == 0.5
