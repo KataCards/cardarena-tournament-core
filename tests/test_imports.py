@@ -57,3 +57,10 @@ def test_bracket_importable_from_root_and_common():
     from cardarena_tournament_core.common import Bracket as CommonBracket
 
     assert Bracket is CommonBracket
+
+
+def test_double_elimination_importable_from_root_and_pairings():
+    from cardarena_tournament_core import DoubleElimination
+    from cardarena_tournament_core.pairings import DoubleElimination as FromPairings
+
+    assert DoubleElimination is FromPairings
