@@ -137,9 +137,13 @@ class Swiss(BasePairing):
                 self._points[matchup.player1.id] += self._draw_points
                 self._points[matchup.player2.id] += self._draw_points
                 self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
+            elif matchup.outcome == MatchupOutcome.DOUBLE_LOSS:
+                # Both players lose: no points, but the pair has played.
+                self._played_pairs.add(frozenset([matchup.player1.id, matchup.player2.id]))
             else:
                 raise PairingStateError(
-                    "Swiss matchups must resolve to PLAYER1_WINS, PLAYER2_WINS, or DRAW."
+                    "Swiss matchups must resolve to PLAYER1_WINS, PLAYER2_WINS, DRAW, "
+                    "or DOUBLE_LOSS."
                 )
         super().submit_results(completed_round)
 
